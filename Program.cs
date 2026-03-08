@@ -7,7 +7,7 @@ class Program
 
     static async Task Main(string[] args)
     {
-        using var service = new HttpSimulationService("https://localhost:44351/", "u007-key");
+        using var service = new HttpSimulationService("https://envrosym.azurewebsites.net/", "u007-key");
 
         while (true)
         {
