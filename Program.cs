@@ -4,10 +4,14 @@ using System.Threading.Tasks;
 class Program
 {
     private const int DeviceCount = 3;
+    private const string HostedBaseUrl = "https://envrosym.azurewebsites.net/";
 
     static async Task Main(string[] args)
     {
-        using var service = new HttpSimulationService("https://envrosym.azurewebsites.net/", "u007-key");
+        var baseUrl = ResolveBaseUrl();
+        using var service = new HttpSimulationService(baseUrl, "u007-key");
+
+        Console.WriteLine($"Using API base URL: {baseUrl}");
 
         while (true)
         {
@@ -266,5 +270,16 @@ class Program
         {
             await service.SetFanState(i, state);
         }
+    }
+
+    private static string ResolveBaseUrl()
+    {
+        var configured = Environment.GetEnvironmentVariable("UGLYCLIENT_BASE_URL");
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return configured;
+        }
+
+        return HostedBaseUrl;
     }
 }
