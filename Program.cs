@@ -32,6 +32,7 @@ class Program
         ISensor sensor2Adapter = new Sensor2Adapter(client);
         ISensor sensor3Adapter = new Sensor3Adapter(client);
         ISensor[] sensorAdapters = [sensor1Adapter, sensor2Adapter, sensor3Adapter];
+        ISensorService sensorService = new SensorService(sensorAdapters);
 
         // Facade / Service layer: FanService encapsulates all fan-related HTTP calls.
         IFanService fanService = new FanService(client, config.FanCount);
@@ -54,7 +55,7 @@ class Program
             switch (input)
             {
                 case "1":
-                
+
                     Console.Write("Enter Fan Number: ");
                     if (int.TryParse(Console.ReadLine(), out int fanId))
                     {
@@ -78,7 +79,7 @@ class Program
                     }
                     break;
                 case "2":
-                    
+
                     Console.Write("Enter Heater Number: ");
                     if (int.TryParse(Console.ReadLine(), out int heaterId))
                     {
@@ -106,29 +107,18 @@ class Program
                     }
                     break;
                 case "3":
-                    
+
                     Console.Write("Enter Sensor Number: ");
                     if (int.TryParse(Console.ReadLine(), out int sensorId))
                     {
                         try
                         {
-                            ISensor? selectedAdapter = sensorId switch
-                            {
-                                1 => sensor1Adapter,
-                                2 => sensor2Adapter,
-                                3 => sensor3Adapter,
-                                _ => null
-                            };
-
-                            if (selectedAdapter is null)
-                            {
-                                Console.WriteLine($"Sensor {sensorId} not found. Valid sensors are 1, 2, or 3.");
-                            }
-                            else
-                            {
-                                double temperature = await selectedAdapter.GetTemperatureAsync();
-                                Console.WriteLine($"Sensor {sensorId} Temperature: {temperature:F1}°C");
-                            }
+                            double temperature = await sensorService.GetTemperatureAsync(sensorId);
+                            Console.WriteLine($"Sensor {sensorId} Temperature: {temperature:F1}°C");
+                        }
+                        catch (KeyNotFoundException)
+                        {
+                            Console.WriteLine($"Sensor {sensorId} not found. Valid sensors are 1, 2, or 3.");
                         }
                         catch (Exception ex)
                         {
@@ -159,14 +149,7 @@ class Program
                         Console.WriteLine("Fetching sensor temperatures individually...");
                         try
                         {
-                            var s1Temp = await sensor1Adapter.GetTemperatureAsync();
-                            Console.WriteLine($"  Sensor 1: Temperature {s1Temp:F1} (Deg)");
-
-                            var s2Temp = await sensor2Adapter.GetTemperatureAsync();
-                            Console.WriteLine($"  Sensor 2: Temperature {s2Temp:F1} (Deg)");
-
-                            var s3Temp = await sensor3Adapter.GetTemperatureAsync();
-                            Console.WriteLine($"  Sensor 3: Temperature {s3Temp:F1} (Deg)");
+                            await DisplaySensorTemperaturesAsync(sensorService, config.SensorCount);
                         }
                         catch (Exception ex)
                         {
@@ -182,21 +165,21 @@ class Program
                     //await RunTemperatureControlLoop(client);
                     Console.WriteLine("Starting temperature control algorithm...");
                     Console.Write("Provide a final Temp Value: ");
-                    double currentTemperature = await GetAverageTemperature(sensorAdapters);
+                    double currentTemperature = await sensorService.GetAverageTemperatureAsync();
                     while (true)
                     {
                         // Phase 1: Gradually increase to 20°C over 30 seconds
-                        currentTemperature = await AdjustTemperature(heaterService, fanService, sensorAdapters, currentTemperature, 20.0, 30);
+                        currentTemperature = await AdjustTemperature(heaterService, fanService, sensorService, currentTemperature, 20.0, 30);
 
                         // Phase 2: Rapidly cool to 16°C
-                        currentTemperature = await AdjustTemperature(heaterService, fanService, sensorAdapters, currentTemperature, 16.0, 10);
+                        currentTemperature = await AdjustTemperature(heaterService, fanService, sensorService, currentTemperature, 16.0, 10);
 
                         // Phase 3: Hold at 16°C for 10 seconds
-                        currentTemperature = await HoldTemperature(heaterService, fanService, sensorAdapters, currentTemperature, 16.0, 10);
+                        currentTemperature = await HoldTemperature(heaterService, fanService, sensorService, currentTemperature, 16.0, 10);
 
                         // Phase 4: Gradually return to 18°C and maintain
-                        currentTemperature = await AdjustTemperature(heaterService, fanService, sensorAdapters, currentTemperature, 18.0, 20);
-                        currentTemperature = await HoldTemperature(heaterService, fanService, sensorAdapters, currentTemperature, 18.0, int.MaxValue); // Maintain until exit
+                        currentTemperature = await AdjustTemperature(heaterService, fanService, sensorService, currentTemperature, 18.0, 20);
+                        currentTemperature = await HoldTemperature(heaterService, fanService, sensorService, currentTemperature, 18.0, int.MaxValue); // Maintain until exit
                     }
                 case "6":
                     // await Reset(client);
@@ -233,14 +216,7 @@ class Program
                                 Console.WriteLine("Fetching sensor temperatures individually...");
                                 try
                                 {
-                                    var s1Temp = await sensor1Adapter.GetTemperatureAsync();
-                                    Console.WriteLine($"  Sensor 1: Temperature {s1Temp:F1} (Deg)");
-
-                                    var s2Temp = await sensor2Adapter.GetTemperatureAsync();
-                                    Console.WriteLine($"  Sensor 2: Temperature {s2Temp:F1} (Deg)");
-
-                                    var s3Temp = await sensor3Adapter.GetTemperatureAsync();
-                                    Console.WriteLine($"  Sensor 3: Temperature {s3Temp:F1} (Deg)");
+                                    await DisplaySensorTemperaturesAsync(sensorService, config.SensorCount);
                                 }
                                 catch (Exception ex)
                                 {
@@ -271,75 +247,17 @@ class Program
         }
     }
 
-    private static async Task Reset(HttpClient client, IHeaterService heaterService, IFanService fanService, IEnumerable<ISensor> sensors)
-    {
-        Console.WriteLine("Resetting client state...");
-
-        try
-        {
-            // Send a POST request to the reset endpoint
-            var response = await client.PostAsync("api/Envo/reset", null);
-
-            if (response.IsSuccessStatusCode)
-            {
-                Console.WriteLine("Client state has been successfully reset.");
-                Console.WriteLine("Fetching the state of all devices...");
-
-                try
-                {
-                    // Get individual fan states
-                    Console.WriteLine("Fetching fan states individually...");
-                    foreach (var fan in await fanService.GetAllFanStatesAsync())
-                    {
-                        Console.WriteLine($"  Fan {fan.Id}: {(fan.IsOn ? "On" : "Off")}");
-                    }
-
-                    // Get individual heater levels
-                    Console.WriteLine("Fetching heater levels individually...");
-                    int heaterIndexReset = 1;
-                    foreach (var heaterLevel in await heaterService.GetAllHeaterLevelsAsync())
-                    {
-                        Console.WriteLine($"  Heater {heaterIndexReset++}: Level {heaterLevel}");
-                    }
-
-                    // Get individual sensor temperatures
-                    Console.WriteLine("Fetching sensor temperatures individually...");
-                    try
-                    {
-                        int sensorIndex = 1;
-                        foreach (var sensor in sensors)
-                        {
-                            var temp = await sensor.GetTemperatureAsync();
-                            Console.WriteLine($"  Sensor {sensorIndex}: Temperature {temp:F1} (Deg)");
-                            sensorIndex++;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error fetching sensor data: {ex.Message}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error fetching device states: {ex.Message}");
-                }
-            }
-            else
-            {
-                Console.WriteLine($"Failed to reset client state: {response.ReasonPhrase}");
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error while resetting client state: {ex.Message}");
-        }
-    }
-
-    static async Task RunTemperatureControlLoop(IHeaterService heaterService, IFanService fanService, IEnumerable<ISensor> sensors)
+    /// <summary>
+    /// Runs the interactive temperature-control loop using the heater, fan, and sensor facades.
+    /// </summary>
+    /// <param name="heaterService">The heater facade used to control all heaters.</param>
+    /// <param name="fanService">The fan facade used to control all fans.</param>
+    /// <param name="sensorService">The sensor facade used to read current temperatures.</param>
+    static async Task RunTemperatureControlLoop(IHeaterService heaterService, IFanService fanService, ISensorService sensorService)
     {
         Console.WriteLine("Starting temperature control algorithm...");
 
-        double currentTemperature = await GetAverageTemperature(sensors);
+        double currentTemperature = await sensorService.GetAverageTemperatureAsync();
 
         // Prompt user for the final target temperature in Phase 4
         Console.Write("Enter the final target temperature for Phase 4: ");
@@ -352,21 +270,31 @@ class Program
         while (true)
         {
             // Phase 1: Gradually increase to 20°C over 30 seconds
-            currentTemperature = await AdjustTemperature(heaterService, fanService, sensors, currentTemperature, 20.0, 30);
+            currentTemperature = await AdjustTemperature(heaterService, fanService, sensorService, currentTemperature, 20.0, 30);
 
             // Phase 2: Rapidly cool to 16°C
-            currentTemperature = await AdjustTemperature(heaterService, fanService, sensors, currentTemperature, 16.0, 10);
+            currentTemperature = await AdjustTemperature(heaterService, fanService, sensorService, currentTemperature, 16.0, 10);
 
             // Phase 3: Hold at 16°C for 10 seconds
-            currentTemperature = await HoldTemperature(heaterService, fanService, sensors, currentTemperature, 16.0, 10);
+            currentTemperature = await HoldTemperature(heaterService, fanService, sensorService, currentTemperature, 16.0, 10);
 
             // Phase 4: Gradually adjust to the user-defined target temperature and maintain
-            currentTemperature = await AdjustTemperature(heaterService, fanService, sensors, currentTemperature, finalTargetTemperature, 20);
-            currentTemperature = await HoldTemperature(heaterService, fanService, sensors, currentTemperature, finalTargetTemperature, int.MaxValue); // Maintain until exit
+            currentTemperature = await AdjustTemperature(heaterService, fanService, sensorService, currentTemperature, finalTargetTemperature, 20);
+            currentTemperature = await HoldTemperature(heaterService, fanService, sensorService, currentTemperature, finalTargetTemperature, int.MaxValue); // Maintain until exit
         }
     }
 
-    static async Task<double> AdjustTemperature(IHeaterService heaterService, IFanService fanService, IEnumerable<ISensor> sensors, double currentTemperature, double targetTemperature, int durationSeconds)
+    /// <summary>
+    /// Gradually moves the environment temperature toward a target over a bounded duration.
+    /// </summary>
+    /// <param name="heaterService">The heater facade used to raise temperature.</param>
+    /// <param name="fanService">The fan facade used to lower temperature.</param>
+    /// <param name="sensorService">The sensor facade used to read average temperature.</param>
+    /// <param name="currentTemperature">The current average temperature before the adjustment loop starts.</param>
+    /// <param name="targetTemperature">The target average temperature.</param>
+    /// <param name="durationSeconds">The maximum number of one-second adjustment iterations to run.</param>
+    /// <returns>The final average temperature observed when the loop ends.</returns>
+    static async Task<double> AdjustTemperature(IHeaterService heaterService, IFanService fanService, ISensorService sensorService, double currentTemperature, double targetTemperature, int durationSeconds)
     {
         Console.WriteLine($"Adjusting temperature to {targetTemperature}°C over {durationSeconds} seconds...");
         int intervalMs = 1000; // 1-second intervals
@@ -391,14 +319,24 @@ class Program
 
             // Wait for a second and fetch the updated temperature
             await Task.Delay(intervalMs);
-            currentTemperature = await GetAverageTemperature(sensors);
+            currentTemperature = await sensorService.GetAverageTemperatureAsync();
             Console.WriteLine($"Current Temperature: {currentTemperature:F1}°C");
         }
 
         return currentTemperature;
     }
 
-    static async Task<double> HoldTemperature(IHeaterService heaterService, IFanService fanService, IEnumerable<ISensor> sensors, double currentTemperature, double targetTemperature, int durationSeconds)
+    /// <summary>
+    /// Attempts to maintain the environment near a target temperature for a duration.
+    /// </summary>
+    /// <param name="heaterService">The heater facade used to apply corrective heating.</param>
+    /// <param name="fanService">The fan facade used to apply corrective cooling.</param>
+    /// <param name="sensorService">The sensor facade used to read average temperature.</param>
+    /// <param name="currentTemperature">The current average temperature before the hold loop starts.</param>
+    /// <param name="targetTemperature">The target average temperature to maintain.</param>
+    /// <param name="durationSeconds">The number of one-second iterations to perform.</param>
+    /// <returns>The final average temperature observed when the hold loop ends.</returns>
+    static async Task<double> HoldTemperature(IHeaterService heaterService, IFanService fanService, ISensorService sensorService, double currentTemperature, double targetTemperature, int durationSeconds)
     {
         Console.WriteLine($"Holding temperature at {targetTemperature}°C for {durationSeconds} seconds...");
         int intervalMs = 1000; // 1-second intervals
@@ -420,7 +358,7 @@ class Program
 
             // Wait for a second and fetch the updated temperature
             await Task.Delay(intervalMs);
-            currentTemperature = await GetAverageTemperature(sensors);
+            currentTemperature = await sensorService.GetAverageTemperatureAsync();
             Console.WriteLine($"Current Temperature: {currentTemperature:F1}°C");
         }
 
@@ -428,22 +366,17 @@ class Program
     }
 
     /// <summary>
-    /// Calculates the average temperature across all provided sensor adapters.
+    /// Writes the current temperature for every configured sensor to the console.
     /// </summary>
-    /// <param name="sensors">The collection of <see cref="ISensor"/> adapters to query.</param>
-    /// <returns>The mean temperature as a <see cref="double"/>.</returns>
-    static async Task<double> GetAverageTemperature(IEnumerable<ISensor> sensors)
+    /// <param name="sensorService">The sensor facade used to retrieve temperatures.</param>
+    /// <param name="sensorCount">The total number of configured sensors to display.</param>
+    static async Task DisplaySensorTemperaturesAsync(ISensorService sensorService, int sensorCount)
     {
-        double total = 0;
-        int count = 0;
-
-        foreach (var sensor in sensors)
+        for (int sensorId = 1; sensorId <= sensorCount; sensorId++)
         {
-            total += await sensor.GetTemperatureAsync();
-            count++;
+            double temperature = await sensorService.GetTemperatureAsync(sensorId);
+            Console.WriteLine($"  Sensor {sensorId}: Temperature {temperature:F1} (Deg)");
         }
-
-        return count > 0 ? total / count : 0;
     }
 
 

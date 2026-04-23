@@ -9,6 +9,11 @@ namespace UglyClient.Interfaces;
 public interface ISensor
 {
     /// <summary>
+    /// Gets the one-based identifier of the sensor represented by this adapter.
+    /// </summary>
+    int SensorId { get; }
+
+    /// <summary>
     /// Asynchronously retrieves the current temperature reading from the sensor.
     /// </summary>
     /// <returns>

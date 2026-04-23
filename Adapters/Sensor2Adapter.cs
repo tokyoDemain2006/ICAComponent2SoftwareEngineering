@@ -18,6 +18,11 @@ public sealed class Sensor2Adapter : ISensor
     private readonly HttpClient _client;
 
     /// <summary>
+    /// Gets the fixed identifier of Sensor 2.
+    /// </summary>
+    public int SensorId => 2;
+
+    /// <summary>
     /// Initialises a new instance of <see cref="Sensor2Adapter"/>.
     /// </summary>
     /// <param name="client">
