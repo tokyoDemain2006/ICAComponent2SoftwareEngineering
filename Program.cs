@@ -2,20 +2,28 @@
 using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
+using UglyClient.Config;
+using UglyClient.Models;
 
 class Program
 {
     static async Task Main(string[] args)
     {
+        var config = new SimulationConfig(
+            FanCount: 3,
+            HeaterCount: 3,
+            SensorCount: 3,
+            BaseUrl: "https://localhost:44351/",
+            ApiKey: "u007-key"
+        );
+
         // https://envrosym.azurewebsites.net/
-        var client = new HttpClient { BaseAddress = new Uri("https://localhost:44351/") };
+        var client = new HttpClient { BaseAddress = new Uri(config.BaseUrl) };
         // var client = new HttpClient { BaseAddress = new Uri("https://envrosym.azurewebsites.net/") };
 
         // Must match the API key in ApiKeyManager (dictionary key)
         // MUST match a DICTIONARY KEY on the server:
-        const string apiKey = "u007-key";
-
-        client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
+        client.DefaultRequestHeaders.Add("X-Api-Key", config.ApiKey);
 
         while (true)
         {
@@ -109,7 +117,7 @@ class Program
                     try
                     {
                         Console.WriteLine("Fetching fan states individually...");
-                        for (int i = 1; i <= 3; i++) // Assuming there are 3 fans for this example
+                        for (int i = 1; i <= config.FanCount; i++)
                         {
                             var fanResponse = await client.GetAsync($"api/fans/{i}/state");
                             if (fanResponse.IsSuccessStatusCode)
@@ -127,7 +135,7 @@ class Program
                             }
                         }
                         Console.WriteLine("Fetching heater levels individually...");
-                        for (int i = 1; i <= 3; i++) // Assuming there are 3 heaters for this example
+                        for (int i = 1; i <= config.HeaterCount; i++)
                         {
                             var heaterResponse = await client.GetAsync($"api/heat/{i}/level");
                             if (heaterResponse.IsSuccessStatusCode)
@@ -207,7 +215,7 @@ class Program
                             {
                                 // Get individual fan states
                                 Console.WriteLine("Fetching fan states individually...");
-                                for (int i = 1; i <= 3; i++) // Assuming there are 3 fans for this example
+                                for (int i = 1; i <= config.FanCount; i++)
                                 {
                                     var fanResponse = await client.GetAsync($"api/fans/{i}/state");
                                     if (fanResponse.IsSuccessStatusCode)
@@ -227,7 +235,7 @@ class Program
 
                                 // Get individual heater levels
                                 Console.WriteLine("Fetching heater levels individually...");
-                                for (int i = 1; i <= 3; i++) // Assuming there are 3 heaters for this example
+                                for (int i = 1; i <= config.HeaterCount; i++)
                                 {
                                     var heaterResponse = await client.GetAsync($"api/heat/{i}/level");
                                     if (heaterResponse.IsSuccessStatusCode)
@@ -290,7 +298,7 @@ class Program
         }
     }
 
-    private static async Task Reset(HttpClient client)
+    private static async Task Reset(HttpClient client, SimulationConfig config)
     {
         Console.WriteLine("Resetting client state...");
 
@@ -308,7 +316,7 @@ class Program
                 {
                     // Get individual fan states
                     Console.WriteLine("Fetching fan states individually...");
-                    for (int i = 1; i <= 3; i++) // Assuming there are 3 fans for this example
+                    for (int i = 1; i <= config.FanCount; i++)
                     {
                         var fanResponse = await client.GetAsync($"api/fans/{i}/state");
                         if (fanResponse.IsSuccessStatusCode)
@@ -328,7 +336,7 @@ class Program
 
                     // Get individual heater levels
                     Console.WriteLine("Fetching heater levels individually...");
-                    for (int i = 1; i <= 3; i++) // Assuming there are 3 heaters for this example
+                    for (int i = 1; i <= config.HeaterCount; i++)
                     {
                         var heaterResponse = await client.GetAsync($"api/heat/{i}/level");
                         if (heaterResponse.IsSuccessStatusCode)
@@ -580,11 +588,5 @@ class Program
         }
     }
 
-
-    public class FanDTO
-    {
-        public int Id { get; set; }
-        public bool IsOn { get; set; }
-    }
 
 }
