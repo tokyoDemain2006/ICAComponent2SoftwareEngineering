@@ -36,6 +36,9 @@ class Program
         // Facade / Service layer: FanService encapsulates all fan-related HTTP calls.
         IFanService fanService = new FanService(client, config.FanCount);
 
+        // Facade / Service layer: HeaterService encapsulates all heater-related HTTP calls.
+        IHeaterService heaterService = new HeaterService(client, config.HeaterCount);
+
         while (true)
         {
             Console.WriteLine("Simulation Control:");
@@ -84,7 +87,7 @@ class Program
                         {
                             try
                             {
-                                await SetHeaterLevel(client, heaterId, level);
+                                await heaterService.SetHeaterLevelAsync(heaterId, level);
                                 Console.WriteLine($"Heater {heaterId} level set to {level}.");
                             }
                             catch (Exception ex)
@@ -148,25 +151,10 @@ class Program
                             Console.WriteLine($"  Fan {fan.Id}: {(fan.IsOn ? "On" : "Off")}");
                         }
                         Console.WriteLine("Fetching heater levels individually...");
-                        for (int i = 1; i <= config.HeaterCount; i++)
+                        int heaterIndex4 = 1;
+                        foreach (var heaterLevel in await heaterService.GetAllHeaterLevelsAsync())
                         {
-                            var heaterResponse = await client.GetAsync($"api/heat/{i}/level");
-                            if (heaterResponse.IsSuccessStatusCode)
-                            {
-                                var levelString = await heaterResponse.Content.ReadAsStringAsync();
-                                if (int.TryParse(levelString, out int level))
-                                {
-                                    Console.WriteLine($"  Heater {i}: Level {level}");
-                                }
-                                else
-                                {
-                                    Console.WriteLine($"  Heater {i}: Failed to parse level.");
-                                }
-                            }
-                            else
-                            {
-                                Console.WriteLine($"  Heater {i}: Failed to fetch level.");
-                            }
+                            Console.WriteLine($"  Heater {heaterIndex4++}: Level {heaterLevel}");
                         }
                         Console.WriteLine("Fetching sensor temperatures individually...");
                         try
@@ -198,17 +186,17 @@ class Program
                     while (true)
                     {
                         // Phase 1: Gradually increase to 20°C over 30 seconds
-                        currentTemperature = await AdjustTemperature(client, fanService, sensorAdapters, currentTemperature, 20.0, 30);
+                        currentTemperature = await AdjustTemperature(heaterService, fanService, sensorAdapters, currentTemperature, 20.0, 30);
 
                         // Phase 2: Rapidly cool to 16°C
-                        currentTemperature = await AdjustTemperature(client, fanService, sensorAdapters, currentTemperature, 16.0, 10);
+                        currentTemperature = await AdjustTemperature(heaterService, fanService, sensorAdapters, currentTemperature, 16.0, 10);
 
                         // Phase 3: Hold at 16°C for 10 seconds
-                        currentTemperature = await HoldTemperature(client, fanService, sensorAdapters, currentTemperature, 16.0, 10);
+                        currentTemperature = await HoldTemperature(heaterService, fanService, sensorAdapters, currentTemperature, 16.0, 10);
 
                         // Phase 4: Gradually return to 18°C and maintain
-                        currentTemperature = await AdjustTemperature(client, fanService, sensorAdapters, currentTemperature, 18.0, 20);
-                        currentTemperature = await HoldTemperature(client, fanService, sensorAdapters, currentTemperature, 18.0, int.MaxValue); // Maintain until exit
+                        currentTemperature = await AdjustTemperature(heaterService, fanService, sensorAdapters, currentTemperature, 18.0, 20);
+                        currentTemperature = await HoldTemperature(heaterService, fanService, sensorAdapters, currentTemperature, 18.0, int.MaxValue); // Maintain until exit
                     }
                 case "6":
                     // await Reset(client);
@@ -235,25 +223,10 @@ class Program
 
                                 // Get individual heater levels
                                 Console.WriteLine("Fetching heater levels individually...");
-                                for (int i = 1; i <= config.HeaterCount; i++)
+                                int heaterIndex6 = 1;
+                                foreach (var heaterLevel in await heaterService.GetAllHeaterLevelsAsync())
                                 {
-                                    var heaterResponse = await client.GetAsync($"api/heat/{i}/level");
-                                    if (heaterResponse.IsSuccessStatusCode)
-                                    {
-                                        var levelString = await heaterResponse.Content.ReadAsStringAsync();
-                                        if (int.TryParse(levelString, out int level))
-                                        {
-                                            Console.WriteLine($"  Heater {i}: Level {level}");
-                                        }
-                                        else
-                                        {
-                                            Console.WriteLine($"  Heater {i}: Failed to parse level.");
-                                        }
-                                    }
-                                    else
-                                    {
-                                        Console.WriteLine($"  Heater {i}: Failed to fetch level.");
-                                    }
+                                    Console.WriteLine($"  Heater {heaterIndex6++}: Level {heaterLevel}");
                                 }
 
                                 // Get individual sensor temperatures
@@ -298,7 +271,7 @@ class Program
         }
     }
 
-    private static async Task Reset(HttpClient client, SimulationConfig config, IFanService fanService, IEnumerable<ISensor> sensors)
+    private static async Task Reset(HttpClient client, IHeaterService heaterService, IFanService fanService, IEnumerable<ISensor> sensors)
     {
         Console.WriteLine("Resetting client state...");
 
@@ -323,25 +296,10 @@ class Program
 
                     // Get individual heater levels
                     Console.WriteLine("Fetching heater levels individually...");
-                    for (int i = 1; i <= config.HeaterCount; i++)
+                    int heaterIndexReset = 1;
+                    foreach (var heaterLevel in await heaterService.GetAllHeaterLevelsAsync())
                     {
-                        var heaterResponse = await client.GetAsync($"api/heat/{i}/level");
-                        if (heaterResponse.IsSuccessStatusCode)
-                        {
-                            var levelString = await heaterResponse.Content.ReadAsStringAsync();
-                            if (int.TryParse(levelString, out int level))
-                            {
-                                Console.WriteLine($"  Heater {i}: Level {level}");
-                            }
-                            else
-                            {
-                                Console.WriteLine($"  Heater {i}: Failed to parse level.");
-                            }
-                        }
-                        else
-                        {
-                            Console.WriteLine($"  Heater {i}: Failed to fetch level.");
-                        }
+                        Console.WriteLine($"  Heater {heaterIndexReset++}: Level {heaterLevel}");
                     }
 
                     // Get individual sensor temperatures
@@ -377,7 +335,7 @@ class Program
         }
     }
 
-    static async Task RunTemperatureControlLoop(HttpClient client, IFanService fanService, IEnumerable<ISensor> sensors)
+    static async Task RunTemperatureControlLoop(IHeaterService heaterService, IFanService fanService, IEnumerable<ISensor> sensors)
     {
         Console.WriteLine("Starting temperature control algorithm...");
 
@@ -394,21 +352,21 @@ class Program
         while (true)
         {
             // Phase 1: Gradually increase to 20°C over 30 seconds
-            currentTemperature = await AdjustTemperature(client, fanService, sensors, currentTemperature, 20.0, 30);
+            currentTemperature = await AdjustTemperature(heaterService, fanService, sensors, currentTemperature, 20.0, 30);
 
             // Phase 2: Rapidly cool to 16°C
-            currentTemperature = await AdjustTemperature(client, fanService, sensors, currentTemperature, 16.0, 10);
+            currentTemperature = await AdjustTemperature(heaterService, fanService, sensors, currentTemperature, 16.0, 10);
 
             // Phase 3: Hold at 16°C for 10 seconds
-            currentTemperature = await HoldTemperature(client, fanService, sensors, currentTemperature, 16.0, 10);
+            currentTemperature = await HoldTemperature(heaterService, fanService, sensors, currentTemperature, 16.0, 10);
 
             // Phase 4: Gradually adjust to the user-defined target temperature and maintain
-            currentTemperature = await AdjustTemperature(client, fanService, sensors, currentTemperature, finalTargetTemperature, 20);
-            currentTemperature = await HoldTemperature(client, fanService, sensors, currentTemperature, finalTargetTemperature, int.MaxValue); // Maintain until exit
+            currentTemperature = await AdjustTemperature(heaterService, fanService, sensors, currentTemperature, finalTargetTemperature, 20);
+            currentTemperature = await HoldTemperature(heaterService, fanService, sensors, currentTemperature, finalTargetTemperature, int.MaxValue); // Maintain until exit
         }
     }
 
-    static async Task<double> AdjustTemperature(HttpClient client, IFanService fanService, IEnumerable<ISensor> sensors, double currentTemperature, double targetTemperature, int durationSeconds)
+    static async Task<double> AdjustTemperature(IHeaterService heaterService, IFanService fanService, IEnumerable<ISensor> sensors, double currentTemperature, double targetTemperature, int durationSeconds)
     {
         Console.WriteLine($"Adjusting temperature to {targetTemperature}°C over {durationSeconds} seconds...");
         int intervalMs = 1000; // 1-second intervals
@@ -421,13 +379,13 @@ class Program
             if (currentTemperature < targetTemperature)
             {
                 // Turn on heaters and reduce fan activity
-                await SetAllHeaters(client, 3); // Set heaters to level 3
+                await heaterService.SetAllHeatersAsync(3); // Set heaters to level 3
                 await fanService.SetAllFansAsync(false);    // Turn off fans
             }
             else
             {
                 // Turn off heaters and increase fan activity
-                await SetAllHeaters(client, 0); // Turn off heaters
+                await heaterService.SetAllHeatersAsync(0); // Turn off heaters
                 await fanService.SetAllFansAsync(true);     // Turn on fans
             }
 
@@ -440,7 +398,7 @@ class Program
         return currentTemperature;
     }
 
-    static async Task<double> HoldTemperature(HttpClient client, IFanService fanService, IEnumerable<ISensor> sensors, double currentTemperature, double targetTemperature, int durationSeconds)
+    static async Task<double> HoldTemperature(IHeaterService heaterService, IFanService fanService, IEnumerable<ISensor> sensors, double currentTemperature, double targetTemperature, int durationSeconds)
     {
         Console.WriteLine($"Holding temperature at {targetTemperature}°C for {durationSeconds} seconds...");
         int intervalMs = 1000; // 1-second intervals
@@ -450,13 +408,13 @@ class Program
             if (currentTemperature < targetTemperature)
             {
                 // Turn on heaters slightly and reduce fans
-                await SetAllHeaters(client, 1); // Minimal heating
+                await heaterService.SetAllHeatersAsync(1); // Minimal heating
                 await fanService.SetAllFansAsync(false); // Reduce cooling
             }
             else if (currentTemperature > targetTemperature)
             {
                 // Turn off heaters and increase fans
-                await SetAllHeaters(client, 0); // Turn off heating
+                await heaterService.SetAllHeatersAsync(0); // Turn off heating
                 await fanService.SetAllFansAsync(true); // Activate cooling
             }
 
@@ -486,26 +444,6 @@ class Program
         }
 
         return count > 0 ? total / count : 0;
-    }
-
-    static async Task SetAllHeaters(HttpClient client, int level)
-    {
-        for (int i = 1; i <= 3; i++) // Assuming 3 heaters
-        {
-            await SetHeaterLevel(client, i, level);
-        }
-    }
-
-
-
-    static async Task SetHeaterLevel(HttpClient client, int heaterId, int level)
-    {
-        var response = await client.PostAsync($"api/heat/{heaterId}",
-            new StringContent(level.ToString(), System.Text.Encoding.UTF8, "application/json"));
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new Exception($"Failed to set heater level {heaterId}: {response.ReasonPhrase}");
-        }
     }
 
 
