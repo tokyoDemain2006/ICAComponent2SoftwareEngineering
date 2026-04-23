@@ -7,4 +7,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Exclude the test project subdirectory from the main project's compilation glob -->
+    <Compile Remove="UglyClient.Tests/**" />
+  </ItemGroup>
+
 </Project>
