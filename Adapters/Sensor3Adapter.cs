@@ -18,6 +18,11 @@ public sealed class Sensor3Adapter : ISensor
     private readonly HttpClient _client;
 
     /// <summary>
+    /// Gets the fixed identifier of Sensor 3.
+    /// </summary>
+    public int SensorId => 3;
+
+    /// <summary>
     /// Initialises a new instance of <see cref="Sensor3Adapter"/>.
     /// </summary>
     /// <param name="client">
