@@ -135,26 +135,7 @@ class Program
 
                     try
                     {
-                        Console.WriteLine("Fetching fan states individually...");
-                        foreach (var fan in await fanService.GetAllFanStatesAsync())
-                        {
-                            Console.WriteLine($"  Fan {fan.Id}: {(fan.IsOn ? "On" : "Off")}");
-                        }
-                        Console.WriteLine("Fetching heater levels individually...");
-                        int heaterIndex4 = 1;
-                        foreach (var heaterLevel in await heaterService.GetAllHeaterLevelsAsync())
-                        {
-                            Console.WriteLine($"  Heater {heaterIndex4++}: Level {heaterLevel}");
-                        }
-                        Console.WriteLine("Fetching sensor temperatures individually...");
-                        try
-                        {
-                            await DisplaySensorTemperaturesAsync(sensorService, config.SensorCount);
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"Error fetching sensor data: {ex.Message}");
-                        }
+                        await DisplayAllDeviceStatesAsync(fanService, heaterService, sensorService, config.SensorCount);
                     }
                     catch (Exception ex)
                     {
@@ -197,31 +178,7 @@ class Program
 
                             try
                             {
-                                // Get individual fan states
-                                Console.WriteLine("Fetching fan states individually...");
-                                foreach (var fan in await fanService.GetAllFanStatesAsync())
-                                {
-                                    Console.WriteLine($"  Fan {fan.Id}: {(fan.IsOn ? "On" : "Off")}");
-                                }
-
-                                // Get individual heater levels
-                                Console.WriteLine("Fetching heater levels individually...");
-                                int heaterIndex6 = 1;
-                                foreach (var heaterLevel in await heaterService.GetAllHeaterLevelsAsync())
-                                {
-                                    Console.WriteLine($"  Heater {heaterIndex6++}: Level {heaterLevel}");
-                                }
-
-                                // Get individual sensor temperatures
-                                Console.WriteLine("Fetching sensor temperatures individually...");
-                                try
-                                {
-                                    await DisplaySensorTemperaturesAsync(sensorService, config.SensorCount);
-                                }
-                                catch (Exception ex)
-                                {
-                                    Console.WriteLine($"Error fetching sensor data: {ex.Message}");
-                                }
+                                await DisplayAllDeviceStatesAsync(fanService, heaterService, sensorService, config.SensorCount);
                             }
                             catch (Exception ex)
                             {
@@ -363,6 +320,59 @@ class Program
         }
 
         return currentTemperature;
+    }
+
+    /// <summary>
+    /// Writes the current state of all fans, heaters, and sensors to the console.
+    /// </summary>
+    /// <param name="fanService">The fan facade used to retrieve fan states.</param>
+    /// <param name="heaterService">The heater facade used to retrieve heater levels.</param>
+    /// <param name="sensorService">The sensor facade used to retrieve temperatures.</param>
+    /// <param name="sensorCount">The total number of configured sensors to display.</param>
+    static async Task DisplayAllDeviceStatesAsync(IFanService fanService, IHeaterService heaterService, ISensorService sensorService, int sensorCount)
+    {
+        await DisplayFanStatesAsync(fanService);
+        await DisplayHeaterLevelsAsync(heaterService);
+
+        Console.WriteLine("Fetching sensor temperatures individually...");
+
+        try
+        {
+            await DisplaySensorTemperaturesAsync(sensorService, sensorCount);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching sensor data: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Writes the current state of every configured fan to the console.
+    /// </summary>
+    /// <param name="fanService">The fan facade used to retrieve fan states.</param>
+    static async Task DisplayFanStatesAsync(IFanService fanService)
+    {
+        Console.WriteLine("Fetching fan states individually...");
+
+        foreach (var fan in await fanService.GetAllFanStatesAsync())
+        {
+            Console.WriteLine($"  Fan {fan.Id}: {(fan.IsOn ? "On" : "Off")}");
+        }
+    }
+
+    /// <summary>
+    /// Writes the current level of every configured heater to the console.
+    /// </summary>
+    /// <param name="heaterService">The heater facade used to retrieve heater levels.</param>
+    static async Task DisplayHeaterLevelsAsync(IHeaterService heaterService)
+    {
+        Console.WriteLine("Fetching heater levels individually...");
+
+        int heaterId = 1;
+        foreach (var heaterLevel in await heaterService.GetAllHeaterLevelsAsync())
+        {
+            Console.WriteLine($"  Heater {heaterId++}: Level {heaterLevel}");
+        }
     }
 
     /// <summary>
