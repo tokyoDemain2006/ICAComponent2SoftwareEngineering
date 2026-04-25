@@ -1,140 +1,53 @@
-using System.Net;
 using Moq;
-using Moq.Protected;
 using UglyClient.Adapters;
-using Xunit;
+using UglyClient.Services;
 
 namespace UglyClient.Tests.Adapters;
 
 /// <summary>
 /// Unit tests for <see cref="Sensor3Adapter"/>.
-/// Verifies that the adapter correctly converts the raw <see cref="decimal"/> HTTP response
-/// to a <see cref="double"/> and that HTTP failure paths throw the expected exceptions.
 /// </summary>
 public class Sensor3AdapterTests
 {
-    /// <summary>
-    /// Creates an <see cref="HttpClient"/> whose <see cref="HttpMessageHandler"/> is backed by
-    /// the supplied mock, allowing HTTP responses to be controlled in tests.
-    /// </summary>
-    private static HttpClient BuildClient(Mock<HttpMessageHandler> handlerMock)
-    {
-        return new HttpClient(handlerMock.Object)
-        {
-            BaseAddress = new Uri("http://test-server/")
-        };
-    }
-
-    /// <summary>
-    /// Creates a mock handler that returns the given body with the given status code.
-    /// </summary>
-    private static Mock<HttpMessageHandler> CreateHandler(HttpStatusCode statusCode, string responseBody)
-    {
-        var mock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
-        mock.Protected()
-            .Setup<Task<HttpResponseMessage>>(
-                "SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.IsAny<CancellationToken>())
-            .ReturnsAsync(new HttpResponseMessage
-            {
-                StatusCode = statusCode,
-                Content = new StringContent(responseBody)
-            });
-        return mock;
-    }
-
-    /// <summary>
-    /// When the API returns a valid decimal string, <see cref="Sensor3Adapter.GetTemperatureAsync"/>
-    /// should parse it and return the expected <see cref="double"/>.
-    /// </summary>
     [Fact]
-    public async Task GetTemperatureAsync_ValidDecimalResponse_ReturnsDouble()
+    public void Constructor_NullHttpService_ThrowsArgumentNullException()
     {
-        // Arrange
-        var handler = CreateHandler(HttpStatusCode.OK, "23.75");
-        var adapter = new Sensor3Adapter(BuildClient(handler));
+        Assert.Throws<ArgumentNullException>(() => new Sensor3Adapter(null!));
+    }
 
-        // Act
+    [Fact]
+    public async Task GetTemperatureAsync_ValidResponse_ReturnsDouble()
+    {
+        var httpService = new Mock<IHttpService>(MockBehavior.Strict);
+        httpService.Setup(service => service.GetAsync("api/Sensor/sensor3")).ReturnsAsync("23.75");
+        var adapter = new Sensor3Adapter(httpService.Object);
+
         var result = await adapter.GetTemperatureAsync();
 
-        // Assert
         Assert.Equal(23.75, result, precision: 5);
     }
 
-    /// <summary>
-    /// When the API returns a whole-number decimal string, it should be correctly converted.
-    /// </summary>
     [Fact]
-    public async Task GetTemperatureAsync_WholeNumberDecimalResponse_ReturnsDouble()
+    public async Task GetTemperatureAsync_WhenHttpFails_ThrowsDeviceServiceException()
     {
-        // Arrange
-        var handler = CreateHandler(HttpStatusCode.OK, "18.0");
-        var adapter = new Sensor3Adapter(BuildClient(handler));
+        var httpService = new Mock<IHttpService>(MockBehavior.Strict);
+        httpService
+            .Setup(service => service.GetAsync("api/Sensor/sensor3"))
+            .ThrowsAsync(new DeviceServiceException("The simulation service is unavailable right now."));
+        var adapter = new Sensor3Adapter(httpService.Object);
 
-        // Act
-        var result = await adapter.GetTemperatureAsync();
+        var exception = await Assert.ThrowsAsync<DeviceServiceException>(() => adapter.GetTemperatureAsync());
 
-        // Assert
-        Assert.Equal(18.0, result, precision: 5);
+        Assert.True(exception.Message.Contains("sensor 3", StringComparison.OrdinalIgnoreCase));
     }
 
-    /// <summary>
-    /// Verifies that negative decimal temperatures are correctly handled.
-    /// </summary>
     [Fact]
-    public async Task GetTemperatureAsync_NegativeDecimal_ReturnsNegativeDouble()
+    public async Task GetTemperatureAsync_WhenResponseIsInvalid_ThrowsDeviceServiceException()
     {
-        // Arrange
-        var handler = CreateHandler(HttpStatusCode.OK, "-3.5");
-        var adapter = new Sensor3Adapter(BuildClient(handler));
+        var httpService = new Mock<IHttpService>(MockBehavior.Strict);
+        httpService.Setup(service => service.GetAsync("api/Sensor/sensor3")).ReturnsAsync("not-a-number");
+        var adapter = new Sensor3Adapter(httpService.Object);
 
-        // Act
-        var result = await adapter.GetTemperatureAsync();
-
-        // Assert
-        Assert.Equal(-3.5, result, precision: 5);
-    }
-
-    /// <summary>
-    /// When the HTTP response is not a success status code, an <see cref="Exception"/> should
-    /// be thrown describing the failure.
-    /// </summary>
-    [Fact]
-    public async Task GetTemperatureAsync_HttpFailure_ThrowsException()
-    {
-        // Arrange
-        var handler = CreateHandler(HttpStatusCode.NotFound, string.Empty);
-        var adapter = new Sensor3Adapter(BuildClient(handler));
-
-        // Act & Assert
-        var ex = await Assert.ThrowsAsync<Exception>(() => adapter.GetTemperatureAsync());
-        Assert.Contains("Sensor 3", ex.Message);
-    }
-
-    /// <summary>
-    /// When the HTTP response body is not a parseable decimal, an <see cref="Exception"/>
-    /// should be thrown.
-    /// </summary>
-    [Fact]
-    public async Task GetTemperatureAsync_UnparsableBody_ThrowsException()
-    {
-        // Arrange
-        var handler = CreateHandler(HttpStatusCode.OK, "not-a-number");
-        var adapter = new Sensor3Adapter(BuildClient(handler));
-
-        // Act & Assert
-        var ex = await Assert.ThrowsAsync<Exception>(() => adapter.GetTemperatureAsync());
-        Assert.Contains("Sensor 3", ex.Message);
-    }
-
-    /// <summary>
-    /// Passing a null <see cref="HttpClient"/> to the constructor should throw
-    /// <see cref="ArgumentNullException"/>.
-    /// </summary>
-    [Fact]
-    public void Constructor_NullClient_ThrowsArgumentNullException()
-    {
-        Assert.Throws<ArgumentNullException>(() => new Sensor3Adapter(null!));
+        await Assert.ThrowsAsync<DeviceServiceException>(() => adapter.GetTemperatureAsync());
     }
 }

@@ -1,5 +1,4 @@
 using System;
-using System.Net.Http;
 using System.Threading.Tasks;
 using UglyClient.Adapters;
 using UglyClient.Config;
@@ -24,30 +23,25 @@ class Program
             ApiKey: "u007-key"
         );
 
-        // https://envrosym.azurewebsites.net/
-        var client = new HttpClient { BaseAddress = new Uri(config.BaseUrl) };
-        // var client = new HttpClient { BaseAddress = new Uri("https://envrosym.azurewebsites.net/") };
-
-        // Must match the API key in ApiKeyManager (dictionary key)
-        // MUST match a DICTIONARY KEY on the server:
-        client.DefaultRequestHeaders.Add("X-Api-Key", config.ApiKey);
+        using var httpService = new HttpService(config.BaseUrl, config.ApiKey);
 
         // Adapter Pattern: each sensor adapter wraps its own HTTP call and converts
         // the raw response type to double, conforming to ISensor.
-        ISensor sensor1Adapter = new Sensor1Adapter(client);
-        ISensor sensor2Adapter = new Sensor2Adapter(client);
-        ISensor sensor3Adapter = new Sensor3Adapter(client);
+        ISensor sensor1Adapter = new Sensor1Adapter(httpService);
+        ISensor sensor2Adapter = new Sensor2Adapter(httpService);
+        ISensor sensor3Adapter = new Sensor3Adapter(httpService);
         ISensor[] sensorAdapters = [sensor1Adapter, sensor2Adapter, sensor3Adapter];
         ISensorService sensorService = new SensorService(sensorAdapters);
 
         // Facade / Service layer: FanService encapsulates all fan-related HTTP calls.
-        IFanService fanService = new FanService(client, config.FanCount);
+        IFanService fanService = new FanService(httpService, config.FanCount);
 
         // Facade / Service layer: HeaterService encapsulates all heater-related HTTP calls.
-        IHeaterService heaterService = new HeaterService(client, config.HeaterCount);
+        IHeaterService heaterService = new HeaterService(httpService, config.HeaterCount);
         ITemperatureControlStrategy heatUpStrategy = new HeatUpStrategy(heaterService, fanService, sensorService);
         ITemperatureControlStrategy coolDownStrategy = new CoolDownStrategy(heaterService, fanService, sensorService);
         ITemperatureControlStrategy holdStrategy = new HoldStrategy(heaterService, fanService, sensorService);
+        ISimulationService simulationService = new SimulationService(httpService);
 
         while (true)
         {
@@ -66,7 +60,7 @@ class Program
                 case "1":
 
                     Console.Write("Enter Fan Number: ");
-                    if (int.TryParse(Console.ReadLine(), out int fanId))
+                    if (int.TryParse(Console.ReadLine(), out int fanId) && IsValidDeviceId(fanId, config.FanCount))
                     {
                         Console.Write("Turn Fan On or Off? (on/off): ");
                         var stateInput = Console.ReadLine();
@@ -77,20 +71,20 @@ class Program
                             await fanService.SetFanStateAsync(fanId, isOn);
                             Console.WriteLine($"Fan {fanId} has been turned {(isOn ? "On" : "Off")}.");
                         }
-                        catch (Exception ex)
+                        catch (DeviceServiceException ex)
                         {
-                            Console.WriteLine($"Error: {ex.Message}");
+                            Console.WriteLine(ex.Message);
                         }
                     }
                     else
                     {
-                        Console.WriteLine("Invalid Fan Number.");
+                        Console.WriteLine($"Invalid Fan Number. Please enter a value between 1 and {config.FanCount}.");
                     }
                     break;
                 case "2":
 
                     Console.Write("Enter Heater Number: ");
-                    if (int.TryParse(Console.ReadLine(), out int heaterId))
+                    if (int.TryParse(Console.ReadLine(), out int heaterId) && IsValidDeviceId(heaterId, config.HeaterCount))
                     {
                         Console.Write("Set Heater Level (0-5): ");
                         if (int.TryParse(Console.ReadLine(), out int level) && level >= 0 && level <= 5)
@@ -100,9 +94,9 @@ class Program
                                 await heaterService.SetHeaterLevelAsync(heaterId, level);
                                 Console.WriteLine($"Heater {heaterId} level set to {level}.");
                             }
-                            catch (Exception ex)
+                            catch (DeviceServiceException ex)
                             {
-                                Console.WriteLine($"Error: {ex.Message}");
+                                Console.WriteLine(ex.Message);
                             }
                         }
                         else
@@ -112,31 +106,27 @@ class Program
                     }
                     else
                     {
-                        Console.WriteLine("Invalid Heater Number.");
+                        Console.WriteLine($"Invalid Heater Number. Please enter a value between 1 and {config.HeaterCount}.");
                     }
                     break;
                 case "3":
 
                     Console.Write("Enter Sensor Number: ");
-                    if (int.TryParse(Console.ReadLine(), out int sensorId))
+                    if (int.TryParse(Console.ReadLine(), out int sensorId) && IsValidDeviceId(sensorId, config.SensorCount))
                     {
                         try
                         {
                             double temperature = await sensorService.GetTemperatureAsync(sensorId);
                             Console.WriteLine($"Sensor {sensorId} Temperature: {temperature:F1}°C");
                         }
-                        catch (KeyNotFoundException)
+                        catch (DeviceServiceException ex)
                         {
-                            Console.WriteLine($"Sensor {sensorId} not found. Valid sensors are 1, 2, or 3.");
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"Error: {ex.Message}");
+                            Console.WriteLine(ex.Message);
                         }
                     }
                     else
                     {
-                        Console.WriteLine("Invalid Sensor Number.");
+                        Console.WriteLine($"Invalid Sensor Number. Please enter a value between 1 and {config.SensorCount}.");
                     }
                     break;
                 case "4":
@@ -146,45 +136,34 @@ class Program
                     {
                         await DisplayAllDeviceStatesAsync(fanService, heaterService, sensorService, config.SensorCount);
                     }
-                    catch (Exception ex)
+                    catch (DeviceServiceException ex)
                     {
-                        Console.WriteLine($"Error fetching device states: {ex.Message}");
+                        Console.WriteLine(ex.Message);
                     }
                     break;
                 case "5":
-                    await RunTemperatureControlLoop(sensorService, heatUpStrategy, coolDownStrategy, holdStrategy);
+                    try
+                    {
+                        await RunTemperatureControlLoop(sensorService, heatUpStrategy, coolDownStrategy, holdStrategy);
+                    }
+                    catch (DeviceServiceException ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                    }
                     break;
                 case "6":
-                    // await Reset(client);
                     Console.WriteLine("Resetting client state...");
 
                     try
                     {
-                        // Send a POST request to the reset endpoint
-                        var response = await client.PostAsync("api/Envo/reset", null);
-
-                        if (response.IsSuccessStatusCode)
-                        {
-                            Console.WriteLine("Client state has been successfully reset.");
-                            Console.WriteLine("Fetching the state of all devices...");
-
-                            try
-                            {
-                                await DisplayAllDeviceStatesAsync(fanService, heaterService, sensorService, config.SensorCount);
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"Error fetching device states: {ex.Message}");
-                            }
-                        }
-                        else
-                        {
-                            Console.WriteLine($"Failed to reset client state: {response.ReasonPhrase}");
-                        }
+                        await simulationService.ResetAsync();
+                        Console.WriteLine("Client state has been successfully reset.");
+                        Console.WriteLine("Fetching the state of all devices...");
+                        await DisplayAllDeviceStatesAsync(fanService, heaterService, sensorService, config.SensorCount);
                     }
-                    catch (Exception ex)
+                    catch (DeviceServiceException ex)
                     {
-                        Console.WriteLine($"Error while resetting client state: {ex.Message}");
+                        Console.WriteLine(ex.Message);
                     }
                     break;
                 default:
@@ -283,17 +262,7 @@ class Program
     {
         await DisplayFanStatesAsync(fanService);
         await DisplayHeaterLevelsAsync(heaterService);
-
-        Console.WriteLine("Fetching sensor temperatures individually...");
-
-        try
-        {
-            await DisplaySensorTemperaturesAsync(sensorService, sensorCount);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error fetching sensor data: {ex.Message}");
-        }
+        await DisplaySensorTemperaturesAsync(sensorService, sensorCount);
     }
 
     /// <summary>
@@ -332,11 +301,24 @@ class Program
     /// <param name="sensorCount">The total number of configured sensors to display.</param>
     static async Task DisplaySensorTemperaturesAsync(ISensorService sensorService, int sensorCount)
     {
+        Console.WriteLine("Fetching sensor temperatures individually...");
+
         for (int sensorId = 1; sensorId <= sensorCount; sensorId++)
         {
             double temperature = await sensorService.GetTemperatureAsync(sensorId);
             Console.WriteLine($"  Sensor {sensorId}: Temperature {temperature:F1} (Deg)");
         }
+    }
+
+    /// <summary>
+    /// Determines whether a one-based device identifier is within the configured range.
+    /// </summary>
+    /// <param name="deviceId">The one-based device identifier to validate.</param>
+    /// <param name="deviceCount">The total number of configured devices of that type.</param>
+    /// <returns><see langword="true"/> when the identifier is valid; otherwise <see langword="false"/>.</returns>
+    static bool IsValidDeviceId(int deviceId, int deviceCount)
+    {
+        return deviceId >= 1 && deviceId <= deviceCount;
     }
 
 

@@ -20,9 +20,8 @@ public interface ISensor
     /// A <see cref="Task{TResult}"/> that resolves to the sensor temperature as a
     /// <see cref="double"/> (degrees Celsius).
     /// </returns>
-    /// <exception cref="Exception">
-    /// Thrown when the HTTP request fails or the response cannot be parsed into a
-    /// valid temperature value.
+    /// <exception cref="UglyClient.Services.DeviceServiceException">
+    /// Thrown when the sensor reading cannot be retrieved successfully.
     /// </exception>
     Task<double> GetTemperatureAsync();
 }

@@ -1,305 +1,111 @@
-using System.Net;
-using System.Text;
 using Moq;
-using Moq.Protected;
 using UglyClient.Services;
-using Xunit;
 
 namespace UglyClient.Tests.Services;
 
 /// <summary>
 /// Unit tests for <see cref="HeaterService"/>.
-/// Verifies that the service sends correctly structured HTTP requests and correctly
-/// parses responses or throws descriptive exceptions on failure.
 /// </summary>
 public class HeaterServiceTests
 {
-    // ── helpers ────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Builds an <see cref="HttpClient"/> whose transport is backed by the supplied mock
-    /// handler, with a predictable base address for URL assertions.
-    /// </summary>
-    /// <param name="handlerMock">The mocked <see cref="HttpMessageHandler"/>.</param>
-    /// <returns>An <see cref="HttpClient"/> wired to the mock handler.</returns>
-    private static HttpClient BuildClient(Mock<HttpMessageHandler> handlerMock)
-        => new HttpClient(handlerMock.Object)
-        {
-            BaseAddress = new Uri("http://test-server/")
-        };
-
-    /// <summary>
-    /// Creates a mock handler that always returns the given status code and body,
-    /// regardless of the request URI or method.
-    /// </summary>
-    /// <param name="statusCode">HTTP status code to return.</param>
-    /// <param name="responseBody">Response body text to return.</param>
-    /// <returns>A configured <see cref="Mock{HttpMessageHandler}"/>.</returns>
-    private static Mock<HttpMessageHandler> CreateHandler(HttpStatusCode statusCode, string responseBody)
-    {
-        var mock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
-        mock.Protected()
-            .Setup<Task<HttpResponseMessage>>(
-                "SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.IsAny<CancellationToken>())
-            .ReturnsAsync(new HttpResponseMessage
-            {
-                StatusCode = statusCode,
-                Content = new StringContent(responseBody, Encoding.UTF8, "application/json")
-            });
-        return mock;
-    }
-
-    // ── Constructor ────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Passing a null <see cref="HttpClient"/> should throw <see cref="ArgumentNullException"/>.
-    /// </summary>
     [Fact]
-    public void Constructor_NullClient_ThrowsArgumentNullException()
+    public void Constructor_NullHttpService_ThrowsArgumentNullException()
     {
         Assert.Throws<ArgumentNullException>(() => new HeaterService(null!));
     }
 
-    /// <summary>
-    /// Passing a heater count of zero should throw <see cref="ArgumentOutOfRangeException"/>.
-    /// </summary>
     [Fact]
     public void Constructor_ZeroHeaterCount_ThrowsArgumentOutOfRangeException()
     {
-        var client = BuildClient(CreateHandler(HttpStatusCode.OK, string.Empty));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new HeaterService(client, 0));
+        var httpService = new Mock<IHttpService>();
+        Assert.Throws<ArgumentOutOfRangeException>(() => new HeaterService(httpService.Object, 0));
     }
 
-    // ── SetHeaterLevelAsync ────────────────────────────────────────────────────
-
-    /// <summary>
-    /// When the API returns 200 OK, <see cref="HeaterService.SetHeaterLevelAsync"/> should
-    /// complete without throwing.
-    /// </summary>
     [Fact]
-    public async Task SetHeaterLevelAsync_SuccessResponse_DoesNotThrow()
+    public async Task SetHeaterLevelAsync_CallsExpectedEndpoint()
     {
-        // Arrange
-        var handler = CreateHandler(HttpStatusCode.OK, string.Empty);
-        var service = new HeaterService(BuildClient(handler));
+        var httpService = new Mock<IHttpService>(MockBehavior.Strict);
+        httpService.Setup(service => service.PostAsync("api/heat/2", "5")).ReturnsAsync(string.Empty);
+        var heaterService = new HeaterService(httpService.Object);
 
-        // Act &amp; Assert — no exception expected
-        await service.SetHeaterLevelAsync(1, 3);
+        await heaterService.SetHeaterLevelAsync(2, 5);
+
+        httpService.VerifyAll();
     }
 
-    /// <summary>
-    /// <see cref="HeaterService.SetHeaterLevelAsync"/> must POST the integer level as a
-    /// string to <c>api/heat/{heaterId}</c>.
-    /// </summary>
     [Fact]
-    public async Task SetHeaterLevelAsync_PostsCorrectEndpointAndBody()
+    public async Task SetHeaterLevelAsync_WhenHttpFails_ThrowsDeviceServiceException()
     {
-        // Arrange
-        HttpRequestMessage? captured = null;
-        var mock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
-        mock.Protected()
-            .Setup<Task<HttpResponseMessage>>(
-                "SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.IsAny<CancellationToken>())
-            .Callback<HttpRequestMessage, CancellationToken>((req, _) => captured = req)
-            .ReturnsAsync(new HttpResponseMessage { StatusCode = HttpStatusCode.OK });
+        var httpService = new Mock<IHttpService>(MockBehavior.Strict);
+        httpService
+            .Setup(service => service.PostAsync("api/heat/1", "3"))
+            .ThrowsAsync(new DeviceServiceException("The simulation service is unavailable right now."));
+        var heaterService = new HeaterService(httpService.Object);
 
-        var service = new HeaterService(BuildClient(mock));
+        var exception = await Assert.ThrowsAsync<DeviceServiceException>(() => heaterService.SetHeaterLevelAsync(1, 3));
 
-        // Act
-        await service.SetHeaterLevelAsync(2, 5);
-
-        // Assert
-        Assert.NotNull(captured);
-        Assert.Equal(HttpMethod.Post, captured!.Method);
-        Assert.EndsWith("api/heat/2", captured.RequestUri!.ToString());
-        var body = await captured.Content!.ReadAsStringAsync();
-        Assert.Equal("5", body);
+        Assert.True(exception.Message.Contains("heater 1", StringComparison.OrdinalIgnoreCase));
     }
 
-    /// <summary>
-    /// When the API returns a non-success status code, <see cref="HeaterService.SetHeaterLevelAsync"/>
-    /// must throw an <see cref="Exception"/> that mentions the heater ID.
-    /// </summary>
-    [Fact]
-    public async Task SetHeaterLevelAsync_HttpFailure_ThrowsExceptionWithHeaterId()
-    {
-        // Arrange
-        var handler = CreateHandler(HttpStatusCode.ServiceUnavailable, string.Empty);
-        var service = new HeaterService(BuildClient(handler));
-
-        // Act &amp; Assert
-        var ex = await Assert.ThrowsAsync<Exception>(() => service.SetHeaterLevelAsync(1, 3));
-        Assert.Contains("1", ex.Message);
-    }
-
-    // ── GetHeaterLevelAsync ────────────────────────────────────────────────────
-
-    /// <summary>
-    /// When the API returns a valid integer string body, <see cref="HeaterService.GetHeaterLevelAsync"/>
-    /// should parse and return the correct integer value.
-    /// </summary>
     [Fact]
     public async Task GetHeaterLevelAsync_ValidIntegerResponse_ReturnsLevel()
     {
-        // Arrange
-        var handler = CreateHandler(HttpStatusCode.OK, "4");
-        var service = new HeaterService(BuildClient(handler));
+        var httpService = new Mock<IHttpService>(MockBehavior.Strict);
+        httpService.Setup(service => service.GetAsync("api/heat/3/level")).ReturnsAsync("4");
+        var heaterService = new HeaterService(httpService.Object);
 
-        // Act
-        var level = await service.GetHeaterLevelAsync(1);
+        var level = await heaterService.GetHeaterLevelAsync(3);
 
-        // Assert
         Assert.Equal(4, level);
     }
 
-    /// <summary>
-    /// <see cref="HeaterService.GetHeaterLevelAsync"/> should GET from <c>api/heat/{heaterId}/level</c>.
-    /// </summary>
     [Fact]
-    public async Task GetHeaterLevelAsync_CallsCorrectEndpoint()
+    public async Task GetHeaterLevelAsync_WhenHttpFails_ThrowsDeviceServiceException()
     {
-        // Arrange
-        HttpRequestMessage? captured = null;
-        var mock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
-        mock.Protected()
-            .Setup<Task<HttpResponseMessage>>(
-                "SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
-                ItExpr.IsAny<CancellationToken>())
-            .Callback<HttpRequestMessage, CancellationToken>((req, _) => captured = req)
-            .ReturnsAsync(new HttpResponseMessage
-            {
-                StatusCode = HttpStatusCode.OK,
-                Content = new StringContent("2", Encoding.UTF8, "application/json")
-            });
+        var httpService = new Mock<IHttpService>(MockBehavior.Strict);
+        httpService
+            .Setup(service => service.GetAsync("api/heat/2/level"))
+            .ThrowsAsync(new DeviceServiceException("The simulation service is unavailable right now."));
+        var heaterService = new HeaterService(httpService.Object);
 
-        var service = new HeaterService(BuildClient(mock));
+        var exception = await Assert.ThrowsAsync<DeviceServiceException>(() => heaterService.GetHeaterLevelAsync(2));
 
-        // Act
-        await service.GetHeaterLevelAsync(3);
-
-        // Assert
-        Assert.Equal(HttpMethod.Get, captured!.Method);
-        Assert.EndsWith("api/heat/3/level", captured.RequestUri!.ToString());
+        Assert.True(exception.Message.Contains("heater 2", StringComparison.OrdinalIgnoreCase));
     }
 
-    /// <summary>
-    /// When the API returns a non-success status code, <see cref="HeaterService.GetHeaterLevelAsync"/>
-    /// must throw an <see cref="Exception"/> that mentions the heater ID.
-    /// </summary>
     [Fact]
-    public async Task GetHeaterLevelAsync_HttpFailure_ThrowsExceptionWithHeaterId()
+    public async Task GetHeaterLevelAsync_WhenResponseIsInvalid_ThrowsDeviceServiceException()
     {
-        // Arrange
-        var handler = CreateHandler(HttpStatusCode.NotFound, string.Empty);
-        var service = new HeaterService(BuildClient(handler));
+        var httpService = new Mock<IHttpService>(MockBehavior.Strict);
+        httpService.Setup(service => service.GetAsync("api/heat/1/level")).ReturnsAsync("not-a-number");
+        var heaterService = new HeaterService(httpService.Object);
 
-        // Act &amp; Assert
-        var ex = await Assert.ThrowsAsync<Exception>(() => service.GetHeaterLevelAsync(2));
-        Assert.Contains("2", ex.Message);
+        await Assert.ThrowsAsync<DeviceServiceException>(() => heaterService.GetHeaterLevelAsync(1));
     }
 
-    /// <summary>
-    /// When the API returns a body that cannot be parsed as an integer,
-    /// <see cref="HeaterService.GetHeaterLevelAsync"/> must throw an <see cref="Exception"/>.
-    /// </summary>
     [Fact]
-    public async Task GetHeaterLevelAsync_NonIntegerResponse_ThrowsException()
+    public async Task SetAllHeatersAsync_CallsEachHeaterEndpoint()
     {
-        // Arrange
-        var handler = CreateHandler(HttpStatusCode.OK, "not-a-number");
-        var service = new HeaterService(BuildClient(handler));
+        var httpService = new Mock<IHttpService>(MockBehavior.Strict);
+        httpService.Setup(service => service.PostAsync("api/heat/1", "0")).ReturnsAsync(string.Empty);
+        httpService.Setup(service => service.PostAsync("api/heat/2", "0")).ReturnsAsync(string.Empty);
+        var heaterService = new HeaterService(httpService.Object, heaterCount: 2);
 
-        // Act &amp; Assert
-        await Assert.ThrowsAsync<Exception>(() => service.GetHeaterLevelAsync(1));
+        await heaterService.SetAllHeatersAsync(0);
+
+        httpService.VerifyAll();
     }
 
-    // ── SetAllHeatersAsync ─────────────────────────────────────────────────────
-
-    /// <summary>
-    /// <see cref="HeaterService.SetAllHeatersAsync"/> must issue one POST per heater
-    /// (heaterCount = 2 here), all returning 200, without throwing.
-    /// </summary>
     [Fact]
-    public async Task SetAllHeatersAsync_AllSucceed_DoesNotThrow()
+    public async Task GetAllHeaterLevelsAsync_ReturnsLevelForEachHeater()
     {
-        // Arrange — handler always returns 200; heaterCount = 2 means exactly 2 POST calls
-        var handler = CreateHandler(HttpStatusCode.OK, string.Empty);
-        var service = new HeaterService(BuildClient(handler), heaterCount: 2);
+        var httpService = new Mock<IHttpService>(MockBehavior.Strict);
+        httpService.Setup(service => service.GetAsync("api/heat/1/level")).ReturnsAsync("2");
+        httpService.Setup(service => service.GetAsync("api/heat/2/level")).ReturnsAsync("5");
+        var heaterService = new HeaterService(httpService.Object, heaterCount: 2);
 
-        // Act &amp; Assert
-        await service.SetAllHeatersAsync(3);
-    }
+        var levels = (await heaterService.GetAllHeaterLevelsAsync()).ToList();
 
-    /// <summary>
-    /// When any heater POST fails, <see cref="HeaterService.SetAllHeatersAsync"/> must
-    /// propagate the exception from <see cref="HeaterService.SetHeaterLevelAsync"/>.
-    /// </summary>
-    [Fact]
-    public async Task SetAllHeatersAsync_OneFails_ThrowsException()
-    {
-        // Arrange
-        var handler = CreateHandler(HttpStatusCode.InternalServerError, string.Empty);
-        var service = new HeaterService(BuildClient(handler), heaterCount: 3);
-
-        // Act &amp; Assert
-        await Assert.ThrowsAsync<Exception>(() => service.SetAllHeatersAsync(0));
-    }
-
-    // ── GetAllHeaterLevelsAsync ────────────────────────────────────────────────
-
-    /// <summary>
-    /// <see cref="HeaterService.GetAllHeaterLevelsAsync"/> should return exactly
-    /// <c>heaterCount</c> integer values when all requests succeed.
-    /// </summary>
-    [Fact]
-    public async Task GetAllHeaterLevelsAsync_AllSucceed_ReturnsCorrectCount()
-    {
-        // Arrange — same level returned for every heater
-        var handler = CreateHandler(HttpStatusCode.OK, "2");
-        var service = new HeaterService(BuildClient(handler), heaterCount: 3);
-
-        // Act
-        var levels = await service.GetAllHeaterLevelsAsync();
-
-        // Assert
-        Assert.Equal(3, levels.Count());
-    }
-
-    /// <summary>
-    /// Each item returned by <see cref="HeaterService.GetAllHeaterLevelsAsync"/> should
-    /// equal the parsed integer from the API response body.
-    /// </summary>
-    [Fact]
-    public async Task GetAllHeaterLevelsAsync_AllSucceed_ReturnsCorrectValues()
-    {
-        // Arrange
-        var handler = CreateHandler(HttpStatusCode.OK, "5");
-        var service = new HeaterService(BuildClient(handler), heaterCount: 2);
-
-        // Act
-        var levels = await service.GetAllHeaterLevelsAsync();
-
-        // Assert — every heater should report level 5
-        Assert.All(levels, l => Assert.Equal(5, l));
-    }
-
-    /// <summary>
-    /// When any individual heater GET fails, <see cref="HeaterService.GetAllHeaterLevelsAsync"/>
-    /// must propagate the exception.
-    /// </summary>
-    [Fact]
-    public async Task GetAllHeaterLevelsAsync_OneFails_ThrowsException()
-    {
-        // Arrange
-        var handler = CreateHandler(HttpStatusCode.NotFound, string.Empty);
-        var service = new HeaterService(BuildClient(handler), heaterCount: 2);
-
-        // Act &amp; Assert
-        await Assert.ThrowsAsync<Exception>(() => service.GetAllHeaterLevelsAsync());
+        Assert.Equal([2, 5], levels);
     }
 }
