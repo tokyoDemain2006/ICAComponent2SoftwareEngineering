@@ -1,13 +1,19 @@
-﻿using System;
+using System;
 using System.Net.Http;
 using System.Threading.Tasks;
 using UglyClient.Adapters;
 using UglyClient.Config;
 using UglyClient.Interfaces;
 using UglyClient.Services;
+using UglyClient.Strategies;
 
 class Program
 {
+    /// <summary>
+    /// The tolerance used to treat two temperature readings as effectively equal.
+    /// </summary>
+    private const double TemperatureTolerance = 0.1;
+
     static async Task Main(string[] args)
     {
         var config = new SimulationConfig(
@@ -39,6 +45,9 @@ class Program
 
         // Facade / Service layer: HeaterService encapsulates all heater-related HTTP calls.
         IHeaterService heaterService = new HeaterService(client, config.HeaterCount);
+        ITemperatureControlStrategy heatUpStrategy = new HeatUpStrategy(heaterService, fanService, sensorService);
+        ITemperatureControlStrategy coolDownStrategy = new CoolDownStrategy(heaterService, fanService, sensorService);
+        ITemperatureControlStrategy holdStrategy = new HoldStrategy(heaterService, fanService, sensorService);
 
         while (true)
         {
@@ -162,25 +171,8 @@ class Program
                     }
                     break;
                 case "5":
-                    //await RunTemperatureControlLoop(client);
-                    Console.WriteLine("Starting temperature control algorithm...");
-                    Console.Write("Provide a final Temp Value: ");
-                    double currentTemperature = await sensorService.GetAverageTemperatureAsync();
-                    while (true)
-                    {
-                        // Phase 1: Gradually increase to 20°C over 30 seconds
-                        currentTemperature = await AdjustTemperature(heaterService, fanService, sensorService, currentTemperature, 20.0, 30);
-
-                        // Phase 2: Rapidly cool to 16°C
-                        currentTemperature = await AdjustTemperature(heaterService, fanService, sensorService, currentTemperature, 16.0, 10);
-
-                        // Phase 3: Hold at 16°C for 10 seconds
-                        currentTemperature = await HoldTemperature(heaterService, fanService, sensorService, currentTemperature, 16.0, 10);
-
-                        // Phase 4: Gradually return to 18°C and maintain
-                        currentTemperature = await AdjustTemperature(heaterService, fanService, sensorService, currentTemperature, 18.0, 20);
-                        currentTemperature = await HoldTemperature(heaterService, fanService, sensorService, currentTemperature, 18.0, int.MaxValue); // Maintain until exit
-                    }
+                    await RunTemperatureControlLoop(sensorService, heatUpStrategy, coolDownStrategy, holdStrategy);
+                    break;
                 case "6":
                     // await Reset(client);
                     Console.WriteLine("Resetting client state...");
@@ -250,10 +242,15 @@ class Program
     /// <summary>
     /// Runs the interactive temperature-control loop using the heater, fan, and sensor facades.
     /// </summary>
-    /// <param name="heaterService">The heater facade used to control all heaters.</param>
-    /// <param name="fanService">The fan facade used to control all fans.</param>
     /// <param name="sensorService">The sensor facade used to read current temperatures.</param>
-    static async Task RunTemperatureControlLoop(IHeaterService heaterService, IFanService fanService, ISensorService sensorService)
+    /// <param name="heatUpStrategy">The strategy used when the target temperature is above the current temperature.</param>
+    /// <param name="coolDownStrategy">The strategy used when the target temperature is below the current temperature.</param>
+    /// <param name="holdStrategy">The strategy used to maintain a target temperature.</param>
+    static async Task RunTemperatureControlLoop(
+        ISensorService sensorService,
+        ITemperatureControlStrategy heatUpStrategy,
+        ITemperatureControlStrategy coolDownStrategy,
+        ITemperatureControlStrategy holdStrategy)
     {
         Console.WriteLine("Starting temperature control algorithm...");
 
@@ -270,99 +267,52 @@ class Program
         while (true)
         {
             // Phase 1: Gradually increase to 20°C over 30 seconds
-            currentTemperature = await AdjustTemperature(heaterService, fanService, sensorService, currentTemperature, 20.0, 30);
+            Console.WriteLine("Heating to 20.0°C over 30 seconds...");
+            currentTemperature = await ExecuteAdjustmentPhaseAsync(currentTemperature, 20.0, 30, heatUpStrategy, coolDownStrategy);
+            Console.WriteLine($"Current Temperature: {currentTemperature:F1}°C");
 
             // Phase 2: Rapidly cool to 16°C
-            currentTemperature = await AdjustTemperature(heaterService, fanService, sensorService, currentTemperature, 16.0, 10);
+            Console.WriteLine("Cooling to 16.0°C over 10 seconds...");
+            currentTemperature = await ExecuteAdjustmentPhaseAsync(currentTemperature, 16.0, 10, heatUpStrategy, coolDownStrategy);
+            Console.WriteLine($"Current Temperature: {currentTemperature:F1}°C");
 
             // Phase 3: Hold at 16°C for 10 seconds
-            currentTemperature = await HoldTemperature(heaterService, fanService, sensorService, currentTemperature, 16.0, 10);
+            Console.WriteLine("Holding temperature at 16.0°C for 10 seconds...");
+            currentTemperature = await holdStrategy.ExecuteAsync(currentTemperature, 16.0, 10);
+            Console.WriteLine($"Current Temperature: {currentTemperature:F1}°C");
 
             // Phase 4: Gradually adjust to the user-defined target temperature and maintain
-            currentTemperature = await AdjustTemperature(heaterService, fanService, sensorService, currentTemperature, finalTargetTemperature, 20);
-            currentTemperature = await HoldTemperature(heaterService, fanService, sensorService, currentTemperature, finalTargetTemperature, int.MaxValue); // Maintain until exit
+            Console.WriteLine($"Adjusting temperature to {finalTargetTemperature:F1}°C over 20 seconds...");
+            currentTemperature = await ExecuteAdjustmentPhaseAsync(currentTemperature, finalTargetTemperature, 20, heatUpStrategy, coolDownStrategy);
+            Console.WriteLine($"Current Temperature: {currentTemperature:F1}°C");
+            Console.WriteLine($"Holding temperature at {finalTargetTemperature:F1}°C until exit...");
+            currentTemperature = await holdStrategy.ExecuteAsync(currentTemperature, finalTargetTemperature, int.MaxValue);
         }
     }
 
     /// <summary>
-    /// Gradually moves the environment temperature toward a target over a bounded duration.
+    /// Executes the appropriate adjustment strategy for the requested target temperature.
     /// </summary>
-    /// <param name="heaterService">The heater facade used to raise temperature.</param>
-    /// <param name="fanService">The fan facade used to lower temperature.</param>
-    /// <param name="sensorService">The sensor facade used to read average temperature.</param>
     /// <param name="currentTemperature">The current average temperature before the adjustment loop starts.</param>
     /// <param name="targetTemperature">The target average temperature.</param>
     /// <param name="durationSeconds">The maximum number of one-second adjustment iterations to run.</param>
-    /// <returns>The final average temperature observed when the loop ends.</returns>
-    static async Task<double> AdjustTemperature(IHeaterService heaterService, IFanService fanService, ISensorService sensorService, double currentTemperature, double targetTemperature, int durationSeconds)
+    /// <param name="heatUpStrategy">The strategy used when heating is required.</param>
+    /// <param name="coolDownStrategy">The strategy used when cooling is required.</param>
+    /// <returns>The final average temperature observed when the phase ends.</returns>
+    static async Task<double> ExecuteAdjustmentPhaseAsync(
+        double currentTemperature,
+        double targetTemperature,
+        int durationSeconds,
+        ITemperatureControlStrategy heatUpStrategy,
+        ITemperatureControlStrategy coolDownStrategy)
     {
-        Console.WriteLine($"Adjusting temperature to {targetTemperature}°C over {durationSeconds} seconds...");
-        int intervalMs = 1000; // 1-second intervals
-        int iterations = durationSeconds;
-
-        for (int i = 0; i < iterations; i++)
+        if (Math.Abs(currentTemperature - targetTemperature) <= TemperatureTolerance)
         {
-            if (Math.Abs(currentTemperature - targetTemperature) <= 0.1) break;
-
-            if (currentTemperature < targetTemperature)
-            {
-                // Turn on heaters and reduce fan activity
-                await heaterService.SetAllHeatersAsync(3); // Set heaters to level 3
-                await fanService.SetAllFansAsync(false);    // Turn off fans
-            }
-            else
-            {
-                // Turn off heaters and increase fan activity
-                await heaterService.SetAllHeatersAsync(0); // Turn off heaters
-                await fanService.SetAllFansAsync(true);     // Turn on fans
-            }
-
-            // Wait for a second and fetch the updated temperature
-            await Task.Delay(intervalMs);
-            currentTemperature = await sensorService.GetAverageTemperatureAsync();
-            Console.WriteLine($"Current Temperature: {currentTemperature:F1}°C");
+            return currentTemperature;
         }
 
-        return currentTemperature;
-    }
-
-    /// <summary>
-    /// Attempts to maintain the environment near a target temperature for a duration.
-    /// </summary>
-    /// <param name="heaterService">The heater facade used to apply corrective heating.</param>
-    /// <param name="fanService">The fan facade used to apply corrective cooling.</param>
-    /// <param name="sensorService">The sensor facade used to read average temperature.</param>
-    /// <param name="currentTemperature">The current average temperature before the hold loop starts.</param>
-    /// <param name="targetTemperature">The target average temperature to maintain.</param>
-    /// <param name="durationSeconds">The number of one-second iterations to perform.</param>
-    /// <returns>The final average temperature observed when the hold loop ends.</returns>
-    static async Task<double> HoldTemperature(IHeaterService heaterService, IFanService fanService, ISensorService sensorService, double currentTemperature, double targetTemperature, int durationSeconds)
-    {
-        Console.WriteLine($"Holding temperature at {targetTemperature}°C for {durationSeconds} seconds...");
-        int intervalMs = 1000; // 1-second intervals
-
-        for (int i = 0; i < durationSeconds; i++)
-        {
-            if (currentTemperature < targetTemperature)
-            {
-                // Turn on heaters slightly and reduce fans
-                await heaterService.SetAllHeatersAsync(1); // Minimal heating
-                await fanService.SetAllFansAsync(false); // Reduce cooling
-            }
-            else if (currentTemperature > targetTemperature)
-            {
-                // Turn off heaters and increase fans
-                await heaterService.SetAllHeatersAsync(0); // Turn off heating
-                await fanService.SetAllFansAsync(true); // Activate cooling
-            }
-
-            // Wait for a second and fetch the updated temperature
-            await Task.Delay(intervalMs);
-            currentTemperature = await sensorService.GetAverageTemperatureAsync();
-            Console.WriteLine($"Current Temperature: {currentTemperature:F1}°C");
-        }
-
-        return currentTemperature;
+        var selectedStrategy = currentTemperature < targetTemperature ? heatUpStrategy : coolDownStrategy;
+        return await selectedStrategy.ExecuteAsync(currentTemperature, targetTemperature, durationSeconds);
     }
 
     /// <summary>
