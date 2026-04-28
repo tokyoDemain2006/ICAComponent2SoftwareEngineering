@@ -12,7 +12,9 @@ public interface IHttpService
     /// </summary>
     /// <param name="endpoint">The relative endpoint path (e.g. "api/fans/1").</param>
     /// <returns>The response content as a raw string.</returns>
-    /// <exception cref="HttpRequestException">Thrown when the HTTP response indicates a failure status code.</exception>
+    /// <exception cref="DeviceServiceException">
+    /// Thrown when the request cannot be completed successfully.
+    /// </exception>
     Task<string> GetAsync(string endpoint);
 
     /// <summary>
@@ -22,6 +24,8 @@ public interface IHttpService
     /// <param name="endpoint">The relative endpoint path (e.g. "api/fans/1/state").</param>
     /// <param name="body">The JSON-serialised request body to send.</param>
     /// <returns>The response content as a raw string.</returns>
-    /// <exception cref="HttpRequestException">Thrown when the HTTP response indicates a failure status code.</exception>
+    /// <exception cref="DeviceServiceException">
+    /// Thrown when the request cannot be completed successfully.
+    /// </exception>
     Task<string> PostAsync(string endpoint, string body);
 }

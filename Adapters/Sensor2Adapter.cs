@@ -1,4 +1,5 @@
 using UglyClient.Interfaces;
+using UglyClient.Services;
 
 namespace UglyClient.Adapters;
 
@@ -14,8 +15,8 @@ namespace UglyClient.Adapters;
 /// </remarks>
 public sealed class Sensor2Adapter : ISensor
 {
-    /// <summary>The shared <see cref="HttpClient"/> used to make requests to the sensor API.</summary>
-    private readonly HttpClient _client;
+    /// <summary>The shared HTTP service used to make requests to the sensor API.</summary>
+    private readonly IHttpService _httpService;
 
     /// <summary>
     /// Gets the fixed identifier of Sensor 2.
@@ -25,16 +26,15 @@ public sealed class Sensor2Adapter : ISensor
     /// <summary>
     /// Initialises a new instance of <see cref="Sensor2Adapter"/>.
     /// </summary>
-    /// <param name="client">
-    /// The <see cref="HttpClient"/> pre-configured with the base address and any
-    /// required authentication headers.
+    /// <param name="httpService">
+    /// The shared HTTP service used for sensor requests.
     /// </param>
     /// <exception cref="ArgumentNullException">
-    /// Thrown when <paramref name="client"/> is <see langword="null"/>.
+    /// Thrown when <paramref name="httpService"/> is <see langword="null"/>.
     /// </exception>
-    public Sensor2Adapter(HttpClient client)
+    public Sensor2Adapter(IHttpService httpService)
     {
-        _client = client ?? throw new ArgumentNullException(nameof(client));
+        _httpService = httpService ?? throw new ArgumentNullException(nameof(httpService));
     }
 
     /// <inheritdoc />
@@ -45,20 +45,22 @@ public sealed class Sensor2Adapter : ISensor
     /// </remarks>
     public async Task<double> GetTemperatureAsync()
     {
-        var response = await _client.GetAsync("api/Sensor/sensor2");
+        string content;
 
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            throw new Exception($"Failed to get temperature from Sensor 2: {response.ReasonPhrase}");
+            content = await _httpService.GetAsync("api/Sensor/sensor2");
         }
-
-        var content = await response.Content.ReadAsStringAsync();
+        catch (DeviceServiceException ex)
+        {
+            throw new DeviceServiceException("Unable to load sensor 2 right now.", ex);
+        }
 
         if (!int.TryParse(content, out int temperature))
         {
-            throw new Exception($"Failed to parse Sensor 2 temperature as an integer. Raw value: '{content}'");
+            throw new DeviceServiceException("Unable to read the current temperature from sensor 2.");
         }
 
-        return (double)temperature;
+        return temperature;
     }
 }

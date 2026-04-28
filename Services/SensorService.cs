@@ -60,7 +60,7 @@ public class SensorService : ISensorService
     {
         if (!_sensorsById.TryGetValue(sensorId, out var sensor))
         {
-            throw new KeyNotFoundException($"Sensor {sensorId} was not found.");
+            throw new DeviceServiceException($"Sensor {sensorId} is not available.");
         }
 
         return sensor.GetTemperatureAsync();

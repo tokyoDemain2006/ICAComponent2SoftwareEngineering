@@ -28,6 +28,12 @@ public sealed class HttpService : IHttpService, IDisposable
     private readonly HttpClient _httpClient;
 
     /// <summary>
+    /// Indicates whether this service owns the lifetime of the underlying
+    /// <see cref="HttpClient"/>.
+    /// </summary>
+    private readonly bool _ownsHttpClient;
+
+    /// <summary>
     /// Initialises a new instance of <see cref="HttpService"/>, constructing and configuring
     /// the underlying <see cref="HttpClient"/> with the supplied base URL and API key.
     /// </summary>
@@ -56,6 +62,21 @@ public sealed class HttpService : IHttpService, IDisposable
         };
 
         _httpClient.DefaultRequestHeaders.Add(ApiKeyHeaderName, apiKey);
+        _ownsHttpClient = true;
+    }
+
+    /// <summary>
+    /// Initialises a new instance of <see cref="HttpService"/> around an existing
+    /// <see cref="HttpClient"/>.
+    /// </summary>
+    /// <param name="httpClient">The pre-configured client to use for requests.</param>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="httpClient"/> is <see langword="null"/>.
+    /// </exception>
+    public HttpService(HttpClient httpClient)
+    {
+        _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+        _ownsHttpClient = false;
     }
 
     /// <summary>
@@ -63,14 +84,12 @@ public sealed class HttpService : IHttpService, IDisposable
     /// </summary>
     /// <param name="endpoint">The relative endpoint path (e.g. <c>api/fans/1</c>).</param>
     /// <returns>The response content as a raw string.</returns>
-    /// <exception cref="HttpRequestException">
-    /// Thrown when the HTTP response indicates a failure status code.
+    /// <exception cref="DeviceServiceException">
+    /// Thrown when the request cannot be completed successfully.
     /// </exception>
     public async Task<string> GetAsync(string endpoint)
     {
-        var response = await _httpClient.GetAsync(endpoint);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadAsStringAsync();
+        return await SendAsync(() => new HttpRequestMessage(HttpMethod.Get, endpoint));
     }
 
     /// <summary>
@@ -80,15 +99,48 @@ public sealed class HttpService : IHttpService, IDisposable
     /// <param name="endpoint">The relative endpoint path (e.g. <c>api/fans/1/state</c>).</param>
     /// <param name="body">The JSON-serialised request body to send.</param>
     /// <returns>The response content as a raw string.</returns>
-    /// <exception cref="HttpRequestException">
-    /// Thrown when the HTTP response indicates a failure status code.
+    /// <exception cref="DeviceServiceException">
+    /// Thrown when the request cannot be completed successfully.
     /// </exception>
     public async Task<string> PostAsync(string endpoint, string body)
     {
-        var content = new StringContent(body, Encoding.UTF8, JsonMediaType);
-        var response = await _httpClient.PostAsync(endpoint, content);
-        response.EnsureSuccessStatusCode();
-        return await response.Content.ReadAsStringAsync();
+        return await SendAsync(() => new HttpRequestMessage(HttpMethod.Post, endpoint)
+        {
+            Content = new StringContent(body, Encoding.UTF8, JsonMediaType)
+        });
+    }
+
+    /// <summary>
+    /// Sends an HTTP request and normalises transport and status code failures into a
+    /// <see cref="DeviceServiceException"/>.
+    /// </summary>
+    /// <param name="createRequest">Creates the request to send.</param>
+    /// <returns>The response body as a string.</returns>
+    /// <exception cref="DeviceServiceException">
+    /// Thrown when the request fails or returns a non-success status code.
+    /// </exception>
+    private async Task<string> SendAsync(Func<HttpRequestMessage> createRequest)
+    {
+        try
+        {
+            using var request = createRequest();
+            using var response = await _httpClient.SendAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new DeviceServiceException("The simulation service is unavailable right now.");
+            }
+
+            return await response.Content.ReadAsStringAsync();
+        }
+        catch (DeviceServiceException)
+        {
+            throw;
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new DeviceServiceException("Unable to reach the simulation service right now.", ex);
+        }
     }
 
     /// <summary>
@@ -96,6 +148,9 @@ public sealed class HttpService : IHttpService, IDisposable
     /// </summary>
     public void Dispose()
     {
-        _httpClient.Dispose();
+        if (_ownsHttpClient)
+        {
+            _httpClient.Dispose();
+        }
     }
 }

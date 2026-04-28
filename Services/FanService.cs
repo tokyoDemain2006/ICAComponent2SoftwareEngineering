@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using UglyClient.Models;
 
@@ -6,17 +5,16 @@ namespace UglyClient.Services;
 
 /// <summary>
 /// Concrete implementation of <see cref="IFanService"/> that communicates with the environment
-/// simulation API via an injected <see cref="HttpClient"/>.
+/// simulation API via an injected <see cref="IHttpService"/>.
 /// All fan-related HTTP calls and their error handling are encapsulated here; no other class
 /// should make raw HTTP calls for fan operations.
 /// </summary>
 public class FanService : IFanService
 {
     /// <summary>
-    /// The HTTP client used to communicate with the simulation API.
-    /// Must have its <see cref="HttpClient.BaseAddress"/> set before being injected.
+    /// The shared HTTP service used to communicate with the simulation API.
     /// </summary>
-    private readonly HttpClient _client;
+    private readonly IHttpService _httpService;
 
     /// <summary>
     /// The total number of fans managed by the simulation.
@@ -36,20 +34,19 @@ public class FanService : IFanService
 
     /// <summary>
     /// Initialises a new instance of <see cref="FanService"/> with the specified
-    /// <see cref="HttpClient"/> and optional fan count.
+    /// <see cref="IHttpService"/> and optional fan count.
     /// </summary>
-    /// <param name="client">
-    /// The pre-configured <see cref="HttpClient"/> (with <c>BaseAddress</c> and any required
-    /// headers already set). Must not be <c>null</c>.
+    /// <param name="httpService">
+    /// The shared HTTP service used for fan requests. Must not be <see langword="null"/>.
     /// </param>
     /// <param name="fanCount">
     /// The total number of fans in the simulation. Defaults to <c>3</c> when not supplied.
     /// </param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="client"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="httpService"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="fanCount"/> is less than 1.</exception>
-    public FanService(HttpClient client, int fanCount = 3)
+    public FanService(IHttpService httpService, int fanCount = 3)
     {
-        _client = client ?? throw new ArgumentNullException(nameof(client));
+        _httpService = httpService ?? throw new ArgumentNullException(nameof(httpService));
         if (fanCount < 1)
             throw new ArgumentOutOfRangeException(nameof(fanCount), "Fan count must be at least 1.");
         _fanCount = fanCount;
@@ -58,25 +55,39 @@ public class FanService : IFanService
     /// <inheritdoc/>
     public async Task SetFanStateAsync(int fanId, bool isOn)
     {
-        var body = new StringContent(isOn.ToString().ToLower(), Encoding.UTF8, "application/json");
-        var response = await _client.PostAsync($"api/fans/{fanId}", body);
-
-        if (!response.IsSuccessStatusCode)
-            throw new Exception($"Failed to set fan state for fan {fanId}: {response.ReasonPhrase}");
+        try
+        {
+            await _httpService.PostAsync($"api/fans/{fanId}", isOn.ToString().ToLowerInvariant());
+        }
+        catch (DeviceServiceException ex)
+        {
+            throw new DeviceServiceException($"Unable to update fan {fanId} right now.", ex);
+        }
     }
 
     /// <inheritdoc/>
     public async Task<FanDTO> GetFanStateAsync(int fanId)
     {
-        var response = await _client.GetAsync($"api/fans/{fanId}/state");
+        string json;
 
-        if (!response.IsSuccessStatusCode)
-            throw new Exception($"Failed to get fan state for fan {fanId}: {response.ReasonPhrase}");
+        try
+        {
+            json = await _httpService.GetAsync($"api/fans/{fanId}/state");
+        }
+        catch (DeviceServiceException ex)
+        {
+            throw new DeviceServiceException($"Unable to load fan {fanId} right now.", ex);
+        }
 
-        var json = await response.Content.ReadAsStringAsync();
-        var fan = JsonSerializer.Deserialize<FanDTO>(json, JsonOptions);
-
-        return fan ?? throw new Exception($"Fan {fanId} returned a null or unreadable response.");
+        try
+        {
+            var fan = JsonSerializer.Deserialize<FanDTO>(json, JsonOptions);
+            return fan ?? throw new DeviceServiceException($"Unable to read the current state for fan {fanId}.");
+        }
+        catch (JsonException ex)
+        {
+            throw new DeviceServiceException($"Unable to read the current state for fan {fanId}.", ex);
+        }
     }
 
     /// <inheritdoc/>

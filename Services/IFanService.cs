@@ -15,7 +15,9 @@ public interface IFanService
     /// <param name="fanId">The one-based identifier of the fan to control.</param>
     /// <param name="isOn"><c>true</c> to switch the fan on; <c>false</c> to switch it off.</param>
     /// <returns>A <see cref="Task"/> that completes when the API acknowledges the command.</returns>
-    /// <exception cref="Exception">Thrown when the API returns a non-success status code.</exception>
+    /// <exception cref="DeviceServiceException">
+    /// Thrown when the fan update cannot be completed successfully.
+    /// </exception>
     Task SetFanStateAsync(int fanId, bool isOn);
 
     /// <summary>
@@ -26,9 +28,8 @@ public interface IFanService
     /// A <see cref="Task{FanDTO}"/> whose result is the <see cref="FanDTO"/>
     /// describing the fan's current state.
     /// </returns>
-    /// <exception cref="Exception">
-    /// Thrown when the API returns a non-success status code or the response body cannot
-    /// be deserialized into a <see cref="FanDTO"/>.
+    /// <exception cref="DeviceServiceException">
+    /// Thrown when the fan state cannot be retrieved successfully.
     /// </exception>
     Task<FanDTO> GetFanStateAsync(int fanId);
 
@@ -38,8 +39,8 @@ public interface IFanService
     /// </summary>
     /// <param name="isOn"><c>true</c> to switch all fans on; <c>false</c> to switch them all off.</param>
     /// <returns>A <see cref="Task"/> that completes when all fans have been updated.</returns>
-    /// <exception cref="Exception">
-    /// Thrown when any individual fan command returns a non-success status code.
+    /// <exception cref="DeviceServiceException">
+    /// Thrown when any individual fan update cannot be completed successfully.
     /// </exception>
     Task SetAllFansAsync(bool isOn);
 
@@ -50,9 +51,8 @@ public interface IFanService
     /// A <see cref="Task{T}"/> whose result is an <see cref="IEnumerable{FanDTO}"/>
     /// containing one <see cref="FanDTO"/> per fan, ordered by ascending fan ID.
     /// </returns>
-    /// <exception cref="Exception">
-    /// Thrown when any individual fan state query returns a non-success status code or
-    /// cannot be deserialized.
+    /// <exception cref="DeviceServiceException">
+    /// Thrown when any individual fan state cannot be retrieved successfully.
     /// </exception>
     Task<IEnumerable<FanDTO>> GetAllFanStatesAsync();
 }

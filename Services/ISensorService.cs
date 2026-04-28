@@ -15,6 +15,9 @@ public interface ISensorService
     /// A <see cref="Task{TResult}"/> that resolves to the current sensor temperature as a
     /// normalised <see cref="double"/>.
     /// </returns>
+    /// <exception cref="DeviceServiceException">
+    /// Thrown when the requested sensor reading cannot be retrieved successfully.
+    /// </exception>
     Task<double> GetTemperatureAsync(int sensorId);
 
     /// <summary>
@@ -24,5 +27,8 @@ public interface ISensorService
     /// A <see cref="Task{TResult}"/> that resolves to the average temperature across all sensors
     /// as a normalised <see cref="double"/>.
     /// </returns>
+    /// <exception cref="DeviceServiceException">
+    /// Thrown when one or more sensor readings cannot be retrieved successfully.
+    /// </exception>
     Task<double> GetAverageTemperatureAsync();
 }

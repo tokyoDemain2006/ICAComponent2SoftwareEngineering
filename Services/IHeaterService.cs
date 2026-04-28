@@ -13,7 +13,9 @@ public interface IHeaterService
     /// <param name="heaterId">The one-based identifier of the heater to control.</param>
     /// <param name="level">The desired heat level (0–5, where 0 is off).</param>
     /// <returns>A <see cref="Task"/> that completes when the API acknowledges the command.</returns>
-    /// <exception cref="Exception">Thrown when the API returns a non-success status code.</exception>
+    /// <exception cref="DeviceServiceException">
+    /// Thrown when the heater update cannot be completed successfully.
+    /// </exception>
     Task SetHeaterLevelAsync(int heaterId, int level);
 
     /// <summary>
@@ -24,9 +26,8 @@ public interface IHeaterService
     /// A <see cref="Task{T}"/> whose result is the current heat level (0–5) as an
     /// <see cref="int"/>.
     /// </returns>
-    /// <exception cref="Exception">
-    /// Thrown when the API returns a non-success status code or the response body cannot
-    /// be parsed as an integer.
+    /// <exception cref="DeviceServiceException">
+    /// Thrown when the heater level cannot be retrieved successfully.
     /// </exception>
     Task<int> GetHeaterLevelAsync(int heaterId);
 
@@ -36,8 +37,8 @@ public interface IHeaterService
     /// </summary>
     /// <param name="level">The heat level to apply to all heaters (0–5).</param>
     /// <returns>A <see cref="Task"/> that completes when all heaters have been updated.</returns>
-    /// <exception cref="Exception">
-    /// Thrown when any individual heater command returns a non-success status code.
+    /// <exception cref="DeviceServiceException">
+    /// Thrown when any individual heater update cannot be completed successfully.
     /// </exception>
     Task SetAllHeatersAsync(int level);
 
@@ -48,9 +49,8 @@ public interface IHeaterService
     /// A <see cref="Task{T}"/> whose result is an <see cref="IEnumerable{T}"/> of
     /// <see cref="int"/> values, one per heater, ordered by ascending heater ID.
     /// </returns>
-    /// <exception cref="Exception">
-    /// Thrown when any individual heater level query returns a non-success status code or
-    /// cannot be parsed.
+    /// <exception cref="DeviceServiceException">
+    /// Thrown when any individual heater level cannot be retrieved successfully.
     /// </exception>
     Task<IEnumerable<int>> GetAllHeaterLevelsAsync();
 }
