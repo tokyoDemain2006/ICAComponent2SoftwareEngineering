@@ -33,8 +33,8 @@ class Program
 
         // Facade / Service layer: HeaterService encapsulates all heater-related HTTP calls.
         IHeaterService heaterService = new HeaterService(httpService, config.HeaterCount);
-        ISimulationService simulationService = new SimulationService(httpService);
         var temperatureController = new TemperatureController(fanService, heaterService, sensorService);
+        ISimulationService simulationService = new SimulationService(httpService, temperatureController);
 
         while (true)
         {
@@ -135,13 +135,19 @@ class Program
                     }
                     break;
                 case "5":
+                    Console.WriteLine("Starting temperature control algorithm...");
+
                     try
                     {
-                        await RunTemperatureControlAsync(temperatureController);
+                        await simulationService.RunAsync(CancellationToken.None);
                     }
                     catch (DeviceServiceException ex)
                     {
                         Console.WriteLine(ex.Message);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        Console.WriteLine("Temperature control stopped.");
                     }
                     break;
                 case "6":
@@ -165,48 +171,6 @@ class Program
             }
 
             Console.WriteLine(); // Add a blank line for better readability
-        }
-    }
-
-    /// <summary>
-    /// Runs the temperature-control cycle until the user requests cancellation.
-    /// </summary>
-    /// <param name="temperatureController">The controller that orchestrates the strategy sequence.</param>
-    static async Task RunTemperatureControlAsync(TemperatureController temperatureController)
-    {
-        ArgumentNullException.ThrowIfNull(temperatureController);
-
-        Console.WriteLine("Starting temperature control algorithm...");
-
-        if (Console.IsInputRedirected)
-        {
-            Console.WriteLine("Temperature control requires interactive console input for clean cancellation.");
-            return;
-        }
-
-        using var cancellationSource = new CancellationTokenSource();
-        Console.WriteLine("Press Enter to stop temperature control.");
-
-        var controlTask = temperatureController.RunFullCycleAsync(cancellationSource.Token);
-
-        while (!controlTask.IsCompleted)
-        {
-            if (Console.KeyAvailable && Console.ReadKey(intercept: true).Key == ConsoleKey.Enter)
-            {
-                cancellationSource.Cancel();
-                break;
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(200));
-        }
-
-        try
-        {
-            await controlTask;
-        }
-        catch (OperationCanceledException)
-        {
-            Console.WriteLine("Temperature control stopped.");
         }
     }
 
