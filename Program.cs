@@ -1,9 +1,6 @@
 using System;
 using System.Threading.Tasks;
-using UglyClient.Adapters;
 using UglyClient.Config;
-using UglyClient.Controllers;
-using UglyClient.Interfaces;
 using UglyClient.Services;
 
 class Program
@@ -18,23 +15,11 @@ class Program
             ApiKey: "u007-key"
         );
 
-        using var httpService = new HttpService(config.BaseUrl, config.ApiKey);
-
-        // Adapter Pattern: each sensor adapter wraps its own HTTP call and converts
-        // the raw response type to double, conforming to ISensor.
-        ISensor sensor1Adapter = new Sensor1Adapter(httpService);
-        ISensor sensor2Adapter = new Sensor2Adapter(httpService);
-        ISensor sensor3Adapter = new Sensor3Adapter(httpService);
-        ISensor[] sensorAdapters = [sensor1Adapter, sensor2Adapter, sensor3Adapter];
-        ISensorService sensorService = new SensorService(sensorAdapters);
-
-        // Facade / Service layer: FanService encapsulates all fan-related HTTP calls.
-        IFanService fanService = new FanService(httpService, config.FanCount);
-
-        // Facade / Service layer: HeaterService encapsulates all heater-related HTTP calls.
-        IHeaterService heaterService = new HeaterService(httpService, config.HeaterCount);
-        var temperatureController = new TemperatureController(fanService, heaterService, sensorService);
-        ISimulationService simulationService = new SimulationService(httpService, temperatureController);
+        var services = DeviceServiceFactory.Create(config);
+        var fanService = services.FanService;
+        var heaterService = services.HeaterService;
+        var sensorService = services.SensorService;
+        var simulationService = services.SimulationService;
 
         while (true)
         {
