@@ -1,4 +1,5 @@
 using Moq;
+using UglyClient.Controllers;
 using UglyClient.Services;
 
 namespace UglyClient.Tests.Services;
@@ -8,10 +9,25 @@ namespace UglyClient.Tests.Services;
 /// </summary>
 public class SimulationServiceTests
 {
+    private static TemperatureController CreateMockController()
+    {
+        var fanService = new Mock<IFanService>(MockBehavior.Loose);
+        var heaterService = new Mock<IHeaterService>(MockBehavior.Loose);
+        var sensorService = new Mock<ISensorService>(MockBehavior.Loose);
+        return new Mock<TemperatureController>(fanService.Object, heaterService.Object, sensorService.Object).Object;
+    }
+
     [Fact]
     public void Constructor_NullHttpService_ThrowsArgumentNullException()
     {
-        Assert.Throws<ArgumentNullException>(() => new SimulationService(null!));
+        Assert.Throws<ArgumentNullException>(() => new SimulationService(null!, CreateMockController()));
+    }
+
+    [Fact]
+    public void Constructor_NullController_ThrowsArgumentNullException()
+    {
+        var httpService = new Mock<IHttpService>(MockBehavior.Loose);
+        Assert.Throws<ArgumentNullException>(() => new SimulationService(httpService.Object, null!));
     }
 
     [Fact]
@@ -19,7 +35,7 @@ public class SimulationServiceTests
     {
         var httpService = new Mock<IHttpService>(MockBehavior.Strict);
         httpService.Setup(service => service.PostAsync("api/Envo/reset", string.Empty)).ReturnsAsync(string.Empty);
-        var simulationService = new SimulationService(httpService.Object);
+        var simulationService = new SimulationService(httpService.Object, CreateMockController());
 
         await simulationService.ResetAsync();
 
@@ -33,8 +49,45 @@ public class SimulationServiceTests
         httpService
             .Setup(service => service.PostAsync("api/Envo/reset", string.Empty))
             .ThrowsAsync(new DeviceServiceException("The simulation service is unavailable right now."));
-        var simulationService = new SimulationService(httpService.Object);
+        var simulationService = new SimulationService(httpService.Object, CreateMockController());
 
         await Assert.ThrowsAsync<DeviceServiceException>(() => simulationService.ResetAsync());
+    }
+
+    [Fact]
+    public async Task RunAsync_DelegatesToTemperatureController()
+    {
+        var httpService = new Mock<IHttpService>(MockBehavior.Loose);
+        var fanService = new Mock<IFanService>(MockBehavior.Loose);
+        var heaterService = new Mock<IHeaterService>(MockBehavior.Loose);
+        var sensorService = new Mock<ISensorService>(MockBehavior.Loose);
+        var controllerMock = new Mock<TemperatureController>(fanService.Object, heaterService.Object, sensorService.Object);
+        controllerMock
+            .Setup(c => c.RunFullCycleAsync(It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var simulationService = new SimulationService(httpService.Object, controllerMock.Object);
+        await simulationService.RunAsync(CancellationToken.None);
+
+        controllerMock.Verify(c => c.RunFullCycleAsync(CancellationToken.None), Times.Once);
+    }
+
+    [Fact]
+    public async Task RunAsync_PassesCancellationTokenToController()
+    {
+        var httpService = new Mock<IHttpService>(MockBehavior.Loose);
+        var fanService = new Mock<IFanService>(MockBehavior.Loose);
+        var heaterService = new Mock<IHeaterService>(MockBehavior.Loose);
+        var sensorService = new Mock<ISensorService>(MockBehavior.Loose);
+        var controllerMock = new Mock<TemperatureController>(fanService.Object, heaterService.Object, sensorService.Object);
+        using var cts = new CancellationTokenSource();
+        controllerMock
+            .Setup(c => c.RunFullCycleAsync(cts.Token))
+            .Returns(Task.CompletedTask);
+
+        var simulationService = new SimulationService(httpService.Object, controllerMock.Object);
+        await simulationService.RunAsync(cts.Token);
+
+        controllerMock.Verify(c => c.RunFullCycleAsync(cts.Token), Times.Once);
     }
 }

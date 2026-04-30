@@ -79,7 +79,7 @@ public class TemperatureController
     /// </summary>
     /// <param name="cancellationToken">The token used to cancel the cycle cleanly.</param>
     /// <returns>A <see cref="Task"/> that completes when the cycle finishes or is cancelled.</returns>
-    public async Task RunFullCycleAsync(CancellationToken cancellationToken = default)
+    public virtual async Task RunFullCycleAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         double currentTemperature = await _sensorService.GetAverageTemperatureAsync();
