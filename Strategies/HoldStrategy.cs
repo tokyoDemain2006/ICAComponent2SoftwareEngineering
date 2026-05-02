@@ -15,6 +15,12 @@ public class HoldStrategy : ITemperatureControlStrategy
     private const int MinimalHeatingLevel = 1;
 
     /// <summary>
+    /// The tolerance band (in degrees Celsius) within which no corrective device calls are made.
+    /// Deviations smaller than this value are ignored to prevent micro-oscillation.
+    /// </summary>
+    private const double TemperatureTolerance = 0.1;
+
+    /// <summary>
     /// The delay between successive temperature polls.
     /// </summary>
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(1);
@@ -75,12 +81,12 @@ public class HoldStrategy : ITemperatureControlStrategy
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (currentTemperature < targetTemperature)
+            if (targetTemperature - currentTemperature > TemperatureTolerance)
             {
                 await _heaterService.SetAllHeatersAsync(MinimalHeatingLevel);
                 await _fanService.SetAllFansAsync(false);
             }
-            else if (currentTemperature > targetTemperature)
+            else if (currentTemperature - targetTemperature > TemperatureTolerance)
             {
                 await _heaterService.SetAllHeatersAsync(0);
                 await _fanService.SetAllFansAsync(true);

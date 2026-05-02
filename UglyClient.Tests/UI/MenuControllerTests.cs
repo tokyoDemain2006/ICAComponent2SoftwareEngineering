@@ -204,4 +204,35 @@ public class MenuControllerTests
         heaterMock.VerifyNoOtherCalls();
         Assert.Contains("Invalid", output.ToString());
     }
+
+    [Fact]
+    public async Task Option1_InvalidFanState_DoesNotCallServiceAndWritesError()
+    {
+        // Gibberish input for on/off must be rejected; the service must never be called.
+        var fanMock = new Mock<IFanService>(MockBehavior.Strict);
+
+        var output = new StringWriter();
+        // Fan ID 1 is valid; "xyz" is not a valid state
+        var controller = BuildController("1\n1\nxyz\n7\n", output, fanMock: fanMock);
+
+        await controller.RunAsync();
+
+        fanMock.VerifyNoOtherCalls();
+        Assert.Contains("Invalid", output.ToString());
+    }
+
+    [Fact]
+    public async Task Option1_OffInput_TurnsOffFan()
+    {
+        // "off" is a valid state and must call SetFanStateAsync with isOn=false.
+        var fanMock = new Mock<IFanService>();
+        fanMock.Setup(f => f.SetFanStateAsync(It.IsAny<int>(), It.IsAny<bool>())).Returns(Task.CompletedTask);
+
+        var output = new StringWriter();
+        var controller = BuildController("1\n1\noff\n7\n", output, fanMock: fanMock);
+
+        await controller.RunAsync();
+
+        fanMock.Verify(f => f.SetFanStateAsync(1, false), Times.Once);
+    }
 }

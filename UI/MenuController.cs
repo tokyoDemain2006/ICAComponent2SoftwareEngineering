@@ -104,8 +104,14 @@ public sealed class MenuController
         }
 
         _output.Write("Turn Fan On or Off? (on/off): ");
-        var stateInput = _input.ReadLine();
-        bool isOn = stateInput?.ToLower() == "on";
+        var stateInput = _input.ReadLine()?.ToLower();
+        if (stateInput != "on" && stateInput != "off")
+        {
+            _output.WriteLine("Invalid Fan State. Please enter 'on' or 'off'.");
+            return;
+        }
+
+        bool isOn = stateInput == "on";
 
         try
         {

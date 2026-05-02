@@ -5,9 +5,8 @@ namespace UglyClient.Config;
 /// and hardcoded strings from the rest of the codebase.
 /// </summary>
 /// <remarks>
-/// A single instance is constructed in <c>Program.Main</c> and passed down to every
-/// service that needs it. When service classes are extracted (issues #3, #4, #5) they
-/// should accept this record via constructor injection.
+/// A single instance is constructed in <c>Program.Main</c> and passed via constructor
+/// injection to every service that requires it.
 /// </remarks>
 /// <param name="FanCount">Total number of fans managed by the simulation.</param>
 /// <param name="HeaterCount">Total number of heaters managed by the simulation.</param>
