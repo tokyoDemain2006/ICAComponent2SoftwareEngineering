@@ -81,4 +81,33 @@ public class HoldStrategyTests
         fanService.Verify(service => service.SetAllFansAsync(It.IsAny<bool>()), Times.Never);
         sensorService.Verify(service => service.GetAverageTemperatureAsync(), Times.Once);
     }
+
+    [Fact]
+    public void Constructor_NullHeaterService_ThrowsArgumentNullException()
+    {
+        var fanService = new Mock<IFanService>();
+        var sensorService = new Mock<ISensorService>();
+
+        Assert.Throws<ArgumentNullException>(() =>
+            new HoldStrategy(null!, fanService.Object, sensorService.Object));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CancellationRequested_ThrowsOperationCanceledException()
+    {
+        var heaterService = new Mock<IHeaterService>(MockBehavior.Loose);
+        var fanService = new Mock<IFanService>(MockBehavior.Loose);
+        var sensorService = new Mock<ISensorService>(MockBehavior.Loose);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var strategy = new HoldStrategy(
+            heaterService.Object,
+            fanService.Object,
+            sensorService.Object,
+            (_, _) => Task.CompletedTask);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => strategy.ExecuteAsync(16.0, 16.0, 5, cts.Token));
+    }
 }

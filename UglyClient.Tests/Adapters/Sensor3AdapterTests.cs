@@ -50,4 +50,13 @@ public class Sensor3AdapterTests
 
         await Assert.ThrowsAsync<DeviceServiceException>(() => adapter.GetTemperatureAsync());
     }
+
+    [Fact]
+    public void SensorId_ReturnsThree()
+    {
+        var httpService = new Mock<IHttpService>();
+        var adapter = new Sensor3Adapter(httpService.Object);
+
+        Assert.Equal(3, adapter.SensorId);
+    }
 }

@@ -12,6 +12,48 @@ namespace UglyClient.Tests.Controllers;
 public class TemperatureControllerTests
 {
     [Fact]
+    public void Constructor_NullFanService_ThrowsArgumentNullException()
+    {
+        var heaterService = new Mock<IHeaterService>();
+        var sensorService = new Mock<ISensorService>();
+
+        Assert.Throws<ArgumentNullException>(() =>
+            new TemperatureController(null!, heaterService.Object, sensorService.Object));
+    }
+
+    [Fact]
+    public void Constructor_NullHeaterService_ThrowsArgumentNullException()
+    {
+        var fanService = new Mock<IFanService>();
+        var sensorService = new Mock<ISensorService>();
+
+        Assert.Throws<ArgumentNullException>(() =>
+            new TemperatureController(fanService.Object, null!, sensorService.Object));
+    }
+
+    [Fact]
+    public void Constructor_NullSensorService_ThrowsArgumentNullException()
+    {
+        var fanService = new Mock<IFanService>();
+        var heaterService = new Mock<IHeaterService>();
+
+        Assert.Throws<ArgumentNullException>(() =>
+            new TemperatureController(fanService.Object, heaterService.Object, null!));
+    }
+
+    [Fact]
+    public async Task RunPhaseAsync_NullStrategy_ThrowsArgumentNullException()
+    {
+        var fanService = new Mock<IFanService>(MockBehavior.Strict);
+        var heaterService = new Mock<IHeaterService>(MockBehavior.Strict);
+        var sensorService = new Mock<ISensorService>(MockBehavior.Strict);
+        var controller = new TemperatureController(fanService.Object, heaterService.Object, sensorService.Object);
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() =>
+            controller.RunPhaseAsync(null!, 18.0, 20.0, 5));
+    }
+
+    [Fact]
     public async Task RunPhaseAsync_DelegatesToProvidedStrategyWithSuppliedArguments()
     {
         var fanService = new Mock<IFanService>(MockBehavior.Strict);
