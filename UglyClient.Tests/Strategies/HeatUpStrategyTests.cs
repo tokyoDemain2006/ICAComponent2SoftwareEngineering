@@ -105,4 +105,51 @@ public class HeatUpStrategyTests
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => strategy.ExecuteAsync(18.0, 20.0, 5, cts.Token));
     }
+
+    [Fact]
+    public async Task ExecuteAsync_TargetNotReached_StopsAfterDurationIterations()
+    {
+        // If the target is never reached, the strategy must stop after exactly durationSeconds
+        // iterations — not run indefinitely. This verifies the duration-limiting contract.
+        var heaterService = new Mock<IHeaterService>(MockBehavior.Strict);
+        var fanService = new Mock<IFanService>(MockBehavior.Strict);
+        var sensorService = new Mock<ISensorService>(MockBehavior.Strict);
+
+        heaterService.Setup(s => s.SetAllHeatersAsync(3)).Returns(Task.CompletedTask);
+        fanService.Setup(s => s.SetAllFansAsync(false)).Returns(Task.CompletedTask);
+        sensorService.Setup(s => s.GetAverageTemperatureAsync()).ReturnsAsync(14.0);
+
+        var strategy = new HeatUpStrategy(
+            heaterService.Object,
+            fanService.Object,
+            sensorService.Object,
+            (_, _) => Task.CompletedTask);
+
+        var result = await strategy.ExecuteAsync(14.0, 20.0, durationSeconds: 3);
+
+        heaterService.Verify(s => s.SetAllHeatersAsync(3), Times.Exactly(3));
+        fanService.Verify(s => s.SetAllFansAsync(false), Times.Exactly(3));
+        sensorService.Verify(s => s.GetAverageTemperatureAsync(), Times.Exactly(3));
+        Assert.Equal(14.0, result, precision: 5);
+    }
+
+    [Fact]
+    public void Constructor_NullFanService_ThrowsArgumentNullException()
+    {
+        var heaterService = new Mock<IHeaterService>();
+        var sensorService = new Mock<ISensorService>();
+
+        Assert.Throws<ArgumentNullException>(() =>
+            new HeatUpStrategy(heaterService.Object, null!, sensorService.Object));
+    }
+
+    [Fact]
+    public void Constructor_NullSensorService_ThrowsArgumentNullException()
+    {
+        var heaterService = new Mock<IHeaterService>();
+        var fanService = new Mock<IFanService>();
+
+        Assert.Throws<ArgumentNullException>(() =>
+            new HeatUpStrategy(heaterService.Object, fanService.Object, null!));
+    }
 }

@@ -113,4 +113,95 @@ public class MenuControllerTests
 
         Assert.Contains("Fan API unreachable", output.ToString());
     }
+
+    [Fact]
+    public async Task Option4_DisplayAll_CallsAllDeviceServices()
+    {
+        var fanMock = new Mock<IFanService>();
+        var heaterMock = new Mock<IHeaterService>();
+        var sensorMock = new Mock<ISensorService>();
+
+        fanMock.Setup(f => f.GetAllFanStatesAsync())
+            .ReturnsAsync(new[] { new FanDTO { Id = 1, IsOn = true }, new FanDTO { Id = 2, IsOn = false } });
+        heaterMock.Setup(h => h.GetAllHeaterLevelsAsync())
+            .ReturnsAsync(new[] { 2, 3 });
+        sensorMock.Setup(s => s.GetTemperatureAsync(It.IsAny<int>())).ReturnsAsync(20.0);
+
+        var output = new StringWriter();
+        var controller = BuildController("4\n7\n", output, fanMock: fanMock, heaterMock: heaterMock, sensorMock: sensorMock);
+
+        await controller.RunAsync();
+
+        fanMock.Verify(f => f.GetAllFanStatesAsync(), Times.Once);
+        heaterMock.Verify(h => h.GetAllHeaterLevelsAsync(), Times.Once);
+        // DefaultConfig has SensorCount=2, so two individual sensor reads
+        sensorMock.Verify(s => s.GetTemperatureAsync(It.IsAny<int>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task Option5_CallsSimulationRunAsync()
+    {
+        var simMock = new Mock<ISimulationService>();
+        simMock.Setup(s => s.RunAsync(It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+
+        var output = new StringWriter();
+        var controller = BuildController("5\n7\n", output, simMock: simMock);
+
+        await controller.RunAsync();
+
+        simMock.Verify(s => s.RunAsync(CancellationToken.None), Times.Once);
+    }
+
+    [Fact]
+    public async Task Option6_CallsSimulationResetAsync()
+    {
+        var simMock = new Mock<ISimulationService>();
+        var fanMock = new Mock<IFanService>();
+        var heaterMock = new Mock<IHeaterService>();
+        var sensorMock = new Mock<ISensorService>();
+
+        simMock.Setup(s => s.ResetAsync()).Returns(Task.CompletedTask);
+        fanMock.Setup(f => f.GetAllFanStatesAsync()).ReturnsAsync(Array.Empty<FanDTO>());
+        heaterMock.Setup(h => h.GetAllHeaterLevelsAsync()).ReturnsAsync(Array.Empty<int>());
+
+        var output = new StringWriter();
+        var controller = BuildController("6\n7\n", output,
+            fanMock: fanMock, heaterMock: heaterMock, sensorMock: sensorMock, simMock: simMock);
+
+        await controller.RunAsync();
+
+        simMock.Verify(s => s.ResetAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task Option1_OutOfRangeFanId_DoesNotCallServiceAndWritesError()
+    {
+        // Input validation must reject device IDs outside 1–FanCount before calling the service
+        var fanMock = new Mock<IFanService>(MockBehavior.Strict);
+
+        var output = new StringWriter();
+        // DefaultConfig has FanCount=2; ID 99 is out of range
+        var controller = BuildController("1\n99\n7\n", output, fanMock: fanMock);
+
+        await controller.RunAsync();
+
+        fanMock.VerifyNoOtherCalls();
+        Assert.Contains("Invalid", output.ToString());
+    }
+
+    [Fact]
+    public async Task Option2_OutOfRangeHeaterLevel_DoesNotCallServiceAndWritesError()
+    {
+        // Heater levels are bounded 0–5; level 9 must be rejected before calling the service
+        var heaterMock = new Mock<IHeaterService>(MockBehavior.Strict);
+
+        var output = new StringWriter();
+        // Valid heater ID 1, but level 9 exceeds the maximum of 5
+        var controller = BuildController("2\n1\n9\n7\n", output, heaterMock: heaterMock);
+
+        await controller.RunAsync();
+
+        heaterMock.VerifyNoOtherCalls();
+        Assert.Contains("Invalid", output.ToString());
+    }
 }
