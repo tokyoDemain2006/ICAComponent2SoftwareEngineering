@@ -152,4 +152,29 @@ public class HoldStrategyTests
         Assert.Throws<ArgumentNullException>(() =>
             new HoldStrategy(heaterService.Object, fanService.Object, null!));
     }
+
+    [Fact]
+    public async Task ExecuteAsync_WithinTolerance_DoesNotCallDevices()
+    {
+        // A deviation of exactly 0.05°C is inside the 0.1°C tolerance band —
+        // no heater or fan calls should be made for that iteration.
+        var heaterService = new Mock<IHeaterService>(MockBehavior.Strict);
+        var fanService = new Mock<IFanService>(MockBehavior.Strict);
+        var sensorService = new Mock<ISensorService>(MockBehavior.Strict);
+
+        sensorService.Setup(s => s.GetAverageTemperatureAsync()).ReturnsAsync(16.05).Verifiable();
+
+        var strategy = new HoldStrategy(
+            heaterService.Object,
+            fanService.Object,
+            sensorService.Object,
+            (_, _) => Task.CompletedTask);
+
+        // current = 16.05, target = 16.0 → difference = 0.05 < tolerance → no device calls
+        await strategy.ExecuteAsync(16.05, 16.0, durationSeconds: 1);
+
+        heaterService.Verify(h => h.SetAllHeatersAsync(It.IsAny<int>()), Times.Never);
+        fanService.Verify(f => f.SetAllFansAsync(It.IsAny<bool>()), Times.Never);
+        sensorService.Verify(s => s.GetAverageTemperatureAsync(), Times.Once);
+    }
 }

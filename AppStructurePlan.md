@@ -199,7 +199,37 @@ public static class DeviceServiceFactory
 
 ---
 
-## 5. Other Implementation Notes
+### 4.4 Adapter Pattern — `Adapters/`
+
+**What it is:** Converts the interface of a class into another interface that clients expect. The Adapter lets classes work together that could not otherwise because of incompatible interfaces.
+
+**Problem solved:** The three sensor endpoints return temperatures in different types — Sensor 1 returns a plain `string`, Sensor 2 returns an `int`, and Sensor 3 returns a `decimal`. Any code that needs to read all three sensors would otherwise have to know and handle each type separately, spreading type-conversion logic across the codebase.
+
+**How it is applied:**
+
+`Interfaces/ISensor.cs` defines the uniform target interface:
+
+```csharp
+public interface ISensor
+{
+    int SensorId { get; }
+    Task<double> GetTemperatureAsync();
+}
+```
+
+Three concrete adapters in `Adapters/` each wrap one sensor endpoint and normalise its raw response to `double`:
+
+| Adapter | Raw API type | Normalisation |
+|---|---|---|
+| `Sensor1Adapter` | `string` (e.g. `"21.5"`) | `double.TryParse` |
+| `Sensor2Adapter` | `int` (e.g. `21`) | `int.TryParse`, widened to `double` |
+| `Sensor3Adapter` | `decimal` (e.g. `21.75`) | `decimal.TryParse`, cast to `double` |
+
+`SensorService` accepts an `IEnumerable<ISensor>` and calls `GetTemperatureAsync()` on each one uniformly — it never sees the raw types. Adding a fourth sensor requires only a new `ISensor` implementation; `SensorService` does not change (Open/Closed Principle).
+
+---
+
+
 
 ### API Configuration
 - Base URL (`https://localhost:44351/`) and API key (`u007-key`) are hardcoded on lines 11 and 16. Extract to a `Config.cs` static class or `appsettings.json`.
