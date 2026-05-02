@@ -81,4 +81,75 @@ public class HoldStrategyTests
         fanService.Verify(service => service.SetAllFansAsync(It.IsAny<bool>()), Times.Never);
         sensorService.Verify(service => service.GetAverageTemperatureAsync(), Times.Once);
     }
+
+    [Fact]
+    public void Constructor_NullHeaterService_ThrowsArgumentNullException()
+    {
+        var fanService = new Mock<IFanService>();
+        var sensorService = new Mock<ISensorService>();
+
+        Assert.Throws<ArgumentNullException>(() =>
+            new HoldStrategy(null!, fanService.Object, sensorService.Object));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_CancellationRequested_ThrowsOperationCanceledException()
+    {
+        var heaterService = new Mock<IHeaterService>(MockBehavior.Loose);
+        var fanService = new Mock<IFanService>(MockBehavior.Loose);
+        var sensorService = new Mock<ISensorService>(MockBehavior.Loose);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var strategy = new HoldStrategy(
+            heaterService.Object,
+            fanService.Object,
+            sensorService.Object,
+            (_, _) => Task.CompletedTask);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => strategy.ExecuteAsync(16.0, 16.0, 5, cts.Token));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MultipleIterations_PollsSensorEveryIteration()
+    {
+        // HoldStrategy must poll the sensor on every iteration regardless of device state —
+        // this is what makes it "hold" rather than set-and-forget.
+        var heaterService = new Mock<IHeaterService>(MockBehavior.Loose);
+        var fanService = new Mock<IFanService>(MockBehavior.Loose);
+        var sensorService = new Mock<ISensorService>(MockBehavior.Strict);
+
+        sensorService.Setup(s => s.GetAverageTemperatureAsync()).ReturnsAsync(16.0);
+
+        var strategy = new HoldStrategy(
+            heaterService.Object,
+            fanService.Object,
+            sensorService.Object,
+            (_, _) => Task.CompletedTask);
+
+        await strategy.ExecuteAsync(16.0, 16.0, durationSeconds: 3);
+
+        sensorService.Verify(s => s.GetAverageTemperatureAsync(), Times.Exactly(3));
+    }
+
+    [Fact]
+    public void Constructor_NullFanService_ThrowsArgumentNullException()
+    {
+        var heaterService = new Mock<IHeaterService>();
+        var sensorService = new Mock<ISensorService>();
+
+        Assert.Throws<ArgumentNullException>(() =>
+            new HoldStrategy(heaterService.Object, null!, sensorService.Object));
+    }
+
+    [Fact]
+    public void Constructor_NullSensorService_ThrowsArgumentNullException()
+    {
+        var heaterService = new Mock<IHeaterService>();
+        var fanService = new Mock<IFanService>();
+
+        Assert.Throws<ArgumentNullException>(() =>
+            new HoldStrategy(heaterService.Object, fanService.Object, null!));
+    }
 }

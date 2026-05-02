@@ -55,6 +55,22 @@ public class SimulationServiceTests
     }
 
     [Fact]
+    public async Task ResetAsync_WhenHttpFails_ErrorMessageIndicatesReset()
+    {
+        // The service wraps low-level errors with a context-specific message so callers
+        // know the reset operation failed, not some unrelated call.
+        var httpService = new Mock<IHttpService>(MockBehavior.Strict);
+        httpService
+            .Setup(service => service.PostAsync("api/Envo/reset", string.Empty))
+            .ThrowsAsync(new DeviceServiceException("transport failure"));
+        var simulationService = new SimulationService(httpService.Object, CreateMockController());
+
+        var ex = await Assert.ThrowsAsync<DeviceServiceException>(() => simulationService.ResetAsync());
+
+        Assert.Contains("reset", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task RunAsync_DelegatesToTemperatureController()
     {
         var httpService = new Mock<IHttpService>(MockBehavior.Loose);
