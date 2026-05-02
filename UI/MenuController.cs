@@ -10,12 +10,19 @@ namespace UglyClient.UI;
 /// </summary>
 public sealed class MenuController
 {
+    /// <summary>Fan control service.</summary>
     private readonly IFanService _fanService;
+    /// <summary>Heater control service.</summary>
     private readonly IHeaterService _heaterService;
+    /// <summary>Sensor read service.</summary>
     private readonly ISensorService _sensorService;
+    /// <summary>Simulation lifecycle service.</summary>
     private readonly ISimulationService _simulationService;
+    /// <summary>Simulation configuration (used for device counts and validation).</summary>
     private readonly SimulationConfig _config;
+    /// <summary>Reader for user input.</summary>
     private readonly TextReader _input;
+    /// <summary>Writer for program output.</summary>
     private readonly TextWriter _output;
 
     /// <summary>

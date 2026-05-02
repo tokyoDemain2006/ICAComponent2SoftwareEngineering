@@ -1,31 +1,16 @@
 namespace UglyClient.Services;
 
-/// <summary>
-/// Defines the contract for the shared HTTP communication layer used by all service classes.
-/// Implementing classes are responsible for owning and configuring the underlying HTTP client,
-/// including base URL and API key injection.
-/// </summary>
+/// <summary>Contract for the shared HTTP communication layer used by all service classes.</summary>
 public interface IHttpService
 {
-    /// <summary>
-    /// Sends an HTTP GET request to the specified endpoint and returns the response body as a string.
-    /// </summary>
-    /// <param name="endpoint">The relative endpoint path (e.g. "api/fans/1").</param>
-    /// <returns>The response content as a raw string.</returns>
-    /// <exception cref="DeviceServiceException">
-    /// Thrown when the request cannot be completed successfully.
-    /// </exception>
+    /// <summary>Sends a GET request and returns the response body as a string.</summary>
+    /// <param name="endpoint">Relative endpoint path (e.g. <c>api/fans/1</c>).</param>
+    /// <exception cref="DeviceServiceException">Thrown when the request fails.</exception>
     Task<string> GetAsync(string endpoint);
 
-    /// <summary>
-    /// Sends an HTTP POST request to the specified endpoint with the supplied JSON body,
-    /// and returns the response body as a string.
-    /// </summary>
-    /// <param name="endpoint">The relative endpoint path (e.g. "api/fans/1/state").</param>
-    /// <param name="body">The JSON-serialised request body to send.</param>
-    /// <returns>The response content as a raw string.</returns>
-    /// <exception cref="DeviceServiceException">
-    /// Thrown when the request cannot be completed successfully.
-    /// </exception>
+    /// <summary>Sends a POST request with <paramref name="body"/> and returns the response body.</summary>
+    /// <param name="endpoint">Relative endpoint path (e.g. <c>api/fans/1/state</c>).</param>
+    /// <param name="body">JSON-serialised request body.</param>
+    /// <exception cref="DeviceServiceException">Thrown when the request fails.</exception>
     Task<string> PostAsync(string endpoint, string body);
 }
