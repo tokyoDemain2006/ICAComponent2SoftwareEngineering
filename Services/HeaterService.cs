@@ -1,35 +1,12 @@
 namespace UglyClient.Services;
 
-/// <summary>
-/// Concrete implementation of <see cref="IHeaterService"/> that communicates with the environment
-/// simulation API via an injected <see cref="IHttpService"/>.
-/// All heater-related HTTP calls and their error handling are encapsulated here; no other class
-/// should make raw HTTP calls for heater operations.
-/// </summary>
+/// <summary>Concrete <see cref="IHeaterService"/> implementation using an injected <see cref="IHttpService"/>.</summary>
 public class HeaterService : IHeaterService
 {
-    /// <summary>
-    /// The shared HTTP service used to communicate with the simulation API.
-    /// </summary>
     private readonly IHttpService _httpService;
-
-    /// <summary>
-    /// The total number of heaters managed by the simulation.
-    /// Used by <see cref="SetAllHeatersAsync"/> and <see cref="GetAllHeaterLevelsAsync"/> to
-    /// iterate over all heater IDs (1 … <see cref="_heaterCount"/>).
-    /// </summary>
     private readonly int _heaterCount;
 
-    /// <summary>
-    /// Initialises a new instance of <see cref="HeaterService"/> with the specified
-    /// <see cref="IHttpService"/> and optional heater count.
-    /// </summary>
-    /// <param name="httpService">
-    /// The shared HTTP service used for heater requests. Must not be <see langword="null"/>.
-    /// </param>
-    /// <param name="heaterCount">
-    /// The total number of heaters in the simulation. Defaults to <c>3</c> when not supplied.
-    /// </param>
+    /// <summary>Initialises a new instance of <see cref="HeaterService"/>.</summary>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="httpService"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="heaterCount"/> is less than 1.</exception>
     public HeaterService(IHttpService httpService, int heaterCount = 3)

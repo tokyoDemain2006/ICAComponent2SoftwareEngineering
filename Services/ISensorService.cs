@@ -1,34 +1,14 @@
 namespace UglyClient.Services;
 
-/// <summary>
-/// Defines the facade contract for sensor-related temperature retrieval.
-/// Implementations hide adapter selection and aggregation details behind a small
-/// domain-focused API that always returns temperatures as <see cref="double"/>.
-/// </summary>
+/// <summary>Contract for sensor temperature retrieval.</summary>
 public interface ISensorService
 {
-    /// <summary>
-    /// Retrieves the current temperature from the sensor identified by <paramref name="sensorId"/>.
-    /// </summary>
-    /// <param name="sensorId">The one-based identifier of the sensor to query.</param>
-    /// <returns>
-    /// A <see cref="Task{TResult}"/> that resolves to the current sensor temperature as a
-    /// normalised <see cref="double"/>.
-    /// </returns>
-    /// <exception cref="DeviceServiceException">
-    /// Thrown when the requested sensor reading cannot be retrieved successfully.
-    /// </exception>
+    /// <summary>Retrieves the current temperature from a single sensor.</summary>
+    /// <param name="sensorId">One-based sensor identifier.</param>
+    /// <exception cref="DeviceServiceException">Thrown when the reading cannot be retrieved.</exception>
     Task<double> GetTemperatureAsync(int sensorId);
 
-    /// <summary>
-    /// Retrieves the current temperature from every managed sensor and returns the arithmetic mean.
-    /// </summary>
-    /// <returns>
-    /// A <see cref="Task{TResult}"/> that resolves to the average temperature across all sensors
-    /// as a normalised <see cref="double"/>.
-    /// </returns>
-    /// <exception cref="DeviceServiceException">
-    /// Thrown when one or more sensor readings cannot be retrieved successfully.
-    /// </exception>
+    /// <summary>Retrieves the arithmetic mean of all managed sensor readings.</summary>
+    /// <exception cref="DeviceServiceException">Thrown when one or more readings cannot be retrieved.</exception>
     Task<double> GetAverageTemperatureAsync();
 }

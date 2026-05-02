@@ -3,45 +3,14 @@ using UglyClient.Models;
 
 namespace UglyClient.Services;
 
-/// <summary>
-/// Concrete implementation of <see cref="IFanService"/> that communicates with the environment
-/// simulation API via an injected <see cref="IHttpService"/>.
-/// All fan-related HTTP calls and their error handling are encapsulated here; no other class
-/// should make raw HTTP calls for fan operations.
-/// </summary>
+/// <summary>Concrete <see cref="IFanService"/> implementation using an injected <see cref="IHttpService"/>.</summary>
 public class FanService : IFanService
 {
-    /// <summary>
-    /// The shared HTTP service used to communicate with the simulation API.
-    /// </summary>
     private readonly IHttpService _httpService;
-
-    /// <summary>
-    /// The total number of fans managed by the simulation.
-    /// Used by <see cref="SetAllFansAsync"/> and <see cref="GetAllFanStatesAsync"/> to
-    /// iterate over all fan IDs (1 … <see cref="_fanCount"/>).
-    /// </summary>
     private readonly int _fanCount;
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    /// <summary>
-    /// Shared <see cref="JsonSerializerOptions"/> configured for case-insensitive property
-    /// name matching, compatible with the simulation API's JSON responses.
-    /// </summary>
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
-
-    /// <summary>
-    /// Initialises a new instance of <see cref="FanService"/> with the specified
-    /// <see cref="IHttpService"/> and optional fan count.
-    /// </summary>
-    /// <param name="httpService">
-    /// The shared HTTP service used for fan requests. Must not be <see langword="null"/>.
-    /// </param>
-    /// <param name="fanCount">
-    /// The total number of fans in the simulation. Defaults to <c>3</c> when not supplied.
-    /// </param>
+    /// <summary>Initialises a new instance of <see cref="FanService"/>.</summary>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="httpService"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="fanCount"/> is less than 1.</exception>
     public FanService(IHttpService httpService, int fanCount = 3)

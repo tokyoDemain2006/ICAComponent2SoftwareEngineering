@@ -2,25 +2,12 @@ using UglyClient.Interfaces;
 
 namespace UglyClient.Services;
 
-/// <summary>
-/// Facade implementation of <see cref="ISensorService"/> that delegates temperature reads to the
-/// injected sensor adapters and exposes a unified <see cref="double"/>-based API.
-/// This class contains retrieval and aggregation only; it does not apply any business rules.
-/// </summary>
+/// <summary>Facade implementation of <see cref="ISensorService"/> that delegates to injected sensor adapters.</summary>
 public class SensorService : ISensorService
 {
-    /// <summary>
-    /// Lookup of sensor adapters keyed by their one-based sensor identifier.
-    /// </summary>
     private readonly IReadOnlyDictionary<int, ISensor> _sensorsById;
 
-    /// <summary>
-    /// Initialises a new instance of <see cref="SensorService"/>.
-    /// </summary>
-    /// <param name="sensors">
-    /// The sensor adapters managed by this service. Each adapter must expose a unique
-    /// <see cref="ISensor.SensorId"/> value.
-    /// </param>
+    /// <summary>Initialises a new instance of <see cref="SensorService"/>.</summary>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="sensors"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">
     /// Thrown when the sequence is empty, contains a <see langword="null"/> adapter,
