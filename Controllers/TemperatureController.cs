@@ -32,7 +32,7 @@ public class TemperatureController
     /// <summary>
     /// Runs a single control phase by delegating to the supplied strategy.
     /// </summary>
-    public virtual async Task<double> RunPhaseAsync(
+    public async Task<double> RunPhaseAsync(
         ITemperatureControlStrategy strategy,
         double currentTemperature,
         double targetTemperature,
@@ -53,7 +53,7 @@ public class TemperatureController
     /// <summary>
     /// Runs the fixed multi-phase simulation cycle until the final hold phase is cancelled.
     /// </summary>
-    public virtual async Task RunFullCycleAsync(CancellationToken cancellationToken = default)
+    public async Task RunFullCycleAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
         double currentTemperature = await _sensorService.GetAverageTemperatureAsync();

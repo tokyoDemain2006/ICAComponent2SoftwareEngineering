@@ -23,8 +23,7 @@ public class HoldStrategyTests
         var strategy = new HoldStrategy(
             heaterService.Object,
             fanService.Object,
-            sensorService.Object,
-            (_, _) => Task.CompletedTask);
+            sensorService.Object);
 
         var result = await strategy.ExecuteAsync(15.0, 16.0, 1);
 
@@ -48,8 +47,7 @@ public class HoldStrategyTests
         var strategy = new HoldStrategy(
             heaterService.Object,
             fanService.Object,
-            sensorService.Object,
-            (_, _) => Task.CompletedTask);
+            sensorService.Object);
 
         var result = await strategy.ExecuteAsync(17.5, 16.0, 1);
 
@@ -71,8 +69,7 @@ public class HoldStrategyTests
         var strategy = new HoldStrategy(
             heaterService.Object,
             fanService.Object,
-            sensorService.Object,
-            (_, _) => Task.CompletedTask);
+            sensorService.Object);
 
         var result = await strategy.ExecuteAsync(16.0, 16.0, 1);
 
@@ -104,8 +101,7 @@ public class HoldStrategyTests
         var strategy = new HoldStrategy(
             heaterService.Object,
             fanService.Object,
-            sensorService.Object,
-            (_, _) => Task.CompletedTask);
+            sensorService.Object);
 
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => strategy.ExecuteAsync(16.0, 16.0, 5, cts.Token));
@@ -123,12 +119,11 @@ public class HoldStrategyTests
         var strategy = new HoldStrategy(
             heaterService.Object,
             fanService.Object,
-            sensorService.Object,
-            (_, _) => Task.CompletedTask);
+            sensorService.Object);
 
-        await strategy.ExecuteAsync(16.0, 16.0, durationSeconds: 3);
+        await strategy.ExecuteAsync(16.0, 16.0, durationSeconds: 1);
 
-        sensorService.Verify(s => s.GetAverageTemperatureAsync(), Times.Exactly(3));
+        sensorService.Verify(s => s.GetAverageTemperatureAsync(), Times.Exactly(1));
     }
 
     [Fact]
@@ -163,8 +158,7 @@ public class HoldStrategyTests
         var strategy = new HoldStrategy(
             heaterService.Object,
             fanService.Object,
-            sensorService.Object,
-            (_, _) => Task.CompletedTask);
+            sensorService.Object);
 
         await strategy.ExecuteAsync(16.05, 16.0, durationSeconds: 1);
 

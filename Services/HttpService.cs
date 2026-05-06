@@ -17,8 +17,6 @@ public sealed class HttpService : IHttpService, IDisposable
 
     private readonly HttpClient _httpClient;
 
-    private readonly bool _ownsHttpClient;
-
     /// <summary>
     /// Initialises a new instance of <see cref="HttpService"/>, constructing and configuring
     /// the underlying <see cref="HttpClient"/> with the supplied base URL and API key.
@@ -37,7 +35,6 @@ public sealed class HttpService : IHttpService, IDisposable
         };
 
         _httpClient.DefaultRequestHeaders.Add(ApiKeyHeaderName, apiKey);
-        _ownsHttpClient = true;
     }
 
     /// <summary>
@@ -47,7 +44,6 @@ public sealed class HttpService : IHttpService, IDisposable
     public HttpService(HttpClient httpClient)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _ownsHttpClient = false;
     }
 
     /// <summary>
@@ -99,9 +95,6 @@ public sealed class HttpService : IHttpService, IDisposable
     /// </summary>
     public void Dispose()
     {
-        if (_ownsHttpClient)
-        {
-            _httpClient.Dispose();
-        }
+        _httpClient.Dispose();
     }
 }

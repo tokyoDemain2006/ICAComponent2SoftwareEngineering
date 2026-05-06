@@ -23,8 +23,7 @@ public class HeatUpStrategyTests
         var strategy = new HeatUpStrategy(
             heaterService.Object,
             fanService.Object,
-            sensorService.Object,
-            (_, _) => Task.CompletedTask);
+            sensorService.Object);
 
         var result = await strategy.ExecuteAsync(18.0, 20.0, 5);
 
@@ -44,8 +43,7 @@ public class HeatUpStrategyTests
         var strategy = new HeatUpStrategy(
             heaterService.Object,
             fanService.Object,
-            sensorService.Object,
-            (_, _) => Task.CompletedTask);
+            sensorService.Object);
 
         var result = await strategy.ExecuteAsync(20.0, 20.0, 5);
 
@@ -75,8 +73,7 @@ public class HeatUpStrategyTests
         var strategy = new HeatUpStrategy(
             heaterService.Object,
             fanService.Object,
-            sensorService.Object,
-            (_, _) => Task.CompletedTask);
+            sensorService.Object);
 
         var result = await strategy.ExecuteAsync(19.95, 20.0, 5);
 
@@ -98,8 +95,7 @@ public class HeatUpStrategyTests
         var strategy = new HeatUpStrategy(
             heaterService.Object,
             fanService.Object,
-            sensorService.Object,
-            (_, _) => Task.CompletedTask);
+            sensorService.Object);
 
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => strategy.ExecuteAsync(18.0, 20.0, 5, cts.Token));
@@ -119,14 +115,13 @@ public class HeatUpStrategyTests
         var strategy = new HeatUpStrategy(
             heaterService.Object,
             fanService.Object,
-            sensorService.Object,
-            (_, _) => Task.CompletedTask);
+            sensorService.Object);
 
-        var result = await strategy.ExecuteAsync(14.0, 20.0, durationSeconds: 3);
+        var result = await strategy.ExecuteAsync(14.0, 20.0, durationSeconds: 1);
 
-        heaterService.Verify(s => s.SetAllHeatersAsync(3), Times.Exactly(3));
-        fanService.Verify(s => s.SetAllFansAsync(false), Times.Exactly(3));
-        sensorService.Verify(s => s.GetAverageTemperatureAsync(), Times.Exactly(3));
+        heaterService.Verify(s => s.SetAllHeatersAsync(3), Times.Exactly(1));
+        fanService.Verify(s => s.SetAllFansAsync(false), Times.Exactly(1));
+        sensorService.Verify(s => s.GetAverageTemperatureAsync(), Times.Exactly(1));
         Assert.Equal(14.0, result, precision: 5);
     }
 

@@ -11,15 +11,11 @@ public class CoolDownStrategy : ITemperatureControlStrategy
 {
     private const double TemperatureTolerance = 0.1;
 
-    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(1);
-
     private readonly IHeaterService _heaterService;
 
     private readonly IFanService _fanService;
 
     private readonly ISensorService _sensorService;
-
-    private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
 
     /// <summary>
     /// Initialises a new instance of <see cref="CoolDownStrategy"/>.
@@ -27,13 +23,11 @@ public class CoolDownStrategy : ITemperatureControlStrategy
     public CoolDownStrategy(
         IHeaterService heaterService,
         IFanService fanService,
-        ISensorService sensorService,
-        Func<TimeSpan, CancellationToken, Task>? delayAsync = null)
+        ISensorService sensorService)
     {
         _heaterService = heaterService ?? throw new ArgumentNullException(nameof(heaterService));
         _fanService = fanService ?? throw new ArgumentNullException(nameof(fanService));
         _sensorService = sensorService ?? throw new ArgumentNullException(nameof(sensorService));
-        _delayAsync = delayAsync ?? Task.Delay;
     }
 
     public async Task<double> ExecuteAsync(
@@ -55,7 +49,7 @@ public class CoolDownStrategy : ITemperatureControlStrategy
 
             await _heaterService.SetAllHeatersAsync(0);
             await _fanService.SetAllFansAsync(true);
-            await _delayAsync(PollInterval, cancellationToken);
+            await Task.Delay(1000, cancellationToken);
             currentTemperature = await _sensorService.GetAverageTemperatureAsync();
         }
 
