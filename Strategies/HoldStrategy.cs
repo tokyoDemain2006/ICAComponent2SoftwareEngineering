@@ -9,53 +9,23 @@ namespace UglyClient.Strategies;
 /// </summary>
 public class HoldStrategy : ITemperatureControlStrategy
 {
-    /// <summary>
-    /// The heater level applied while correcting a temperature that is below the target.
-    /// </summary>
     private const int MinimalHeatingLevel = 1;
 
-    /// <summary>
-    /// The tolerance band (in degrees Celsius) within which no corrective device calls are made.
-    /// Deviations smaller than this value are ignored to prevent micro-oscillation.
-    /// </summary>
     private const double TemperatureTolerance = 0.1;
 
-    /// <summary>
-    /// The delay between successive temperature polls.
-    /// </summary>
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(1);
 
-    /// <summary>
-    /// The heater facade used to apply corrective heating.
-    /// </summary>
     private readonly IHeaterService _heaterService;
 
-    /// <summary>
-    /// The fan facade used to apply corrective cooling.
-    /// </summary>
     private readonly IFanService _fanService;
 
-    /// <summary>
-    /// The sensor facade used to poll the current average temperature.
-    /// </summary>
     private readonly ISensorService _sensorService;
 
-    /// <summary>
-    /// The delay operation used between polls.
-    /// </summary>
     private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
 
     /// <summary>
     /// Initialises a new instance of <see cref="HoldStrategy"/>.
     /// </summary>
-    /// <param name="heaterService">The heater facade used to control all heaters.</param>
-    /// <param name="fanService">The fan facade used to control all fans.</param>
-    /// <param name="sensorService">The sensor facade used to read temperatures.</param>
-    /// <param name="delayAsync">The delay operation used between temperature polls.</param>
-    /// <exception cref="ArgumentNullException">
-    /// Thrown when <paramref name="heaterService"/>, <paramref name="fanService"/>, or
-    /// <paramref name="sensorService"/> is <see langword="null"/>.
-    /// </exception>
     public HoldStrategy(
         IHeaterService heaterService,
         IFanService fanService,
@@ -68,7 +38,6 @@ public class HoldStrategy : ITemperatureControlStrategy
         _delayAsync = delayAsync ?? Task.Delay;
     }
 
-    /// <inheritdoc />
     public async Task<double> ExecuteAsync(
         double currentTemperature,
         double targetTemperature,

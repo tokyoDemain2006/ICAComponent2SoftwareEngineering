@@ -8,30 +8,14 @@ namespace UglyClient.Services;
 /// </summary>
 public class HeaterService : IHeaterService
 {
-    /// <summary>
-    /// The shared HTTP service used to communicate with the simulation API.
-    /// </summary>
     private readonly IHttpService _httpService;
 
-    /// <summary>
-    /// The total number of heaters managed by the simulation.
-    /// Used by <see cref="SetAllHeatersAsync"/> and <see cref="GetAllHeaterLevelsAsync"/> to
-    /// iterate over all heater IDs (1 … <see cref="_heaterCount"/>).
-    /// </summary>
     private readonly int _heaterCount;
 
     /// <summary>
     /// Initialises a new instance of <see cref="HeaterService"/> with the specified
     /// <see cref="IHttpService"/> and optional heater count.
     /// </summary>
-    /// <param name="httpService">
-    /// The shared HTTP service used for heater requests. Must not be <see langword="null"/>.
-    /// </param>
-    /// <param name="heaterCount">
-    /// The total number of heaters in the simulation. Defaults to <c>3</c> when not supplied.
-    /// </param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="httpService"/> is <c>null</c>.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="heaterCount"/> is less than 1.</exception>
     public HeaterService(IHttpService httpService, int heaterCount = 3)
     {
         _httpService = httpService ?? throw new ArgumentNullException(nameof(httpService));
@@ -40,7 +24,6 @@ public class HeaterService : IHeaterService
         _heaterCount = heaterCount;
     }
 
-    /// <inheritdoc/>
     public async Task SetHeaterLevelAsync(int heaterId, int level)
     {
         try
@@ -53,7 +36,6 @@ public class HeaterService : IHeaterService
         }
     }
 
-    /// <inheritdoc/>
     public async Task<int> GetHeaterLevelAsync(int heaterId)
     {
         string body;
@@ -75,14 +57,12 @@ public class HeaterService : IHeaterService
         return level;
     }
 
-    /// <inheritdoc/>
     public async Task SetAllHeatersAsync(int level)
     {
         for (int i = 1; i <= _heaterCount; i++)
             await SetHeaterLevelAsync(i, level);
     }
 
-    /// <inheritdoc/>
     public async Task<IEnumerable<int>> GetAllHeaterLevelsAsync()
     {
         var levels = new List<int>(_heaterCount);

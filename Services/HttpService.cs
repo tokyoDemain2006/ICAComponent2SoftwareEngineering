@@ -11,43 +11,18 @@ namespace UglyClient.Services;
 /// </summary>
 public sealed class HttpService : IHttpService, IDisposable
 {
-    /// <summary>
-    /// The name of the HTTP request header used for API key authentication.
-    /// </summary>
     private const string ApiKeyHeaderName = "X-Api-Key";
 
-    /// <summary>
-    /// The media type sent in the Content-Type header for POST requests containing a JSON body.
-    /// </summary>
     private const string JsonMediaType = "application/json";
 
-    /// <summary>
-    /// The underlying <see cref="HttpClient"/> owned exclusively by this service.
-    /// It is configured once in the constructor and reused for the lifetime of this instance.
-    /// </summary>
     private readonly HttpClient _httpClient;
 
-    /// <summary>
-    /// Indicates whether this service owns the lifetime of the underlying
-    /// <see cref="HttpClient"/>.
-    /// </summary>
     private readonly bool _ownsHttpClient;
 
     /// <summary>
     /// Initialises a new instance of <see cref="HttpService"/>, constructing and configuring
     /// the underlying <see cref="HttpClient"/> with the supplied base URL and API key.
     /// </summary>
-    /// <param name="baseUrl">
-    /// The base URL of the API (e.g. <c>https://envrosym.azurewebsites.net/</c>).
-    /// All relative endpoint paths supplied to <see cref="GetAsync"/> and
-    /// <see cref="PostAsync"/> are resolved against this URL.
-    /// </param>
-    /// <param name="apiKey">
-    /// The API key injected into every outgoing request via the <c>X-Api-Key</c> header.
-    /// </param>
-    /// <exception cref="ArgumentException">
-    /// Thrown when <paramref name="baseUrl"/> or <paramref name="apiKey"/> is null or whitespace.
-    /// </exception>
     public HttpService(string baseUrl, string apiKey)
     {
         if (string.IsNullOrWhiteSpace(baseUrl))
@@ -69,10 +44,6 @@ public sealed class HttpService : IHttpService, IDisposable
     /// Initialises a new instance of <see cref="HttpService"/> around an existing
     /// <see cref="HttpClient"/>.
     /// </summary>
-    /// <param name="httpClient">The pre-configured client to use for requests.</param>
-    /// <exception cref="ArgumentNullException">
-    /// Thrown when <paramref name="httpClient"/> is <see langword="null"/>.
-    /// </exception>
     public HttpService(HttpClient httpClient)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
@@ -82,11 +53,6 @@ public sealed class HttpService : IHttpService, IDisposable
     /// <summary>
     /// Sends an HTTP GET request to the specified endpoint and returns the response body as a string.
     /// </summary>
-    /// <param name="endpoint">The relative endpoint path (e.g. <c>api/fans/1</c>).</param>
-    /// <returns>The response content as a raw string.</returns>
-    /// <exception cref="DeviceServiceException">
-    /// Thrown when the request cannot be completed successfully.
-    /// </exception>
     public async Task<string> GetAsync(string endpoint)
     {
         return await SendAsync(() => new HttpRequestMessage(HttpMethod.Get, endpoint));
@@ -96,12 +62,6 @@ public sealed class HttpService : IHttpService, IDisposable
     /// Sends an HTTP POST request to the specified endpoint with the supplied JSON body
     /// and returns the response body as a string.
     /// </summary>
-    /// <param name="endpoint">The relative endpoint path (e.g. <c>api/fans/1/state</c>).</param>
-    /// <param name="body">The JSON-serialised request body to send.</param>
-    /// <returns>The response content as a raw string.</returns>
-    /// <exception cref="DeviceServiceException">
-    /// Thrown when the request cannot be completed successfully.
-    /// </exception>
     public async Task<string> PostAsync(string endpoint, string body)
     {
         return await SendAsync(() => new HttpRequestMessage(HttpMethod.Post, endpoint)
@@ -110,15 +70,6 @@ public sealed class HttpService : IHttpService, IDisposable
         });
     }
 
-    /// <summary>
-    /// Sends an HTTP request and normalises transport and status code failures into a
-    /// <see cref="DeviceServiceException"/>.
-    /// </summary>
-    /// <param name="createRequest">Creates the request to send.</param>
-    /// <returns>The response body as a string.</returns>
-    /// <exception cref="DeviceServiceException">
-    /// Thrown when the request fails or returns a non-success status code.
-    /// </exception>
     private async Task<string> SendAsync(Func<HttpRequestMessage> createRequest)
     {
         try

@@ -114,8 +114,6 @@ public class HoldStrategyTests
     [Fact]
     public async Task ExecuteAsync_MultipleIterations_PollsSensorEveryIteration()
     {
-        // HoldStrategy must poll the sensor on every iteration regardless of device state —
-        // this is what makes it "hold" rather than set-and-forget.
         var heaterService = new Mock<IHeaterService>(MockBehavior.Loose);
         var fanService = new Mock<IFanService>(MockBehavior.Loose);
         var sensorService = new Mock<ISensorService>(MockBehavior.Strict);
@@ -156,8 +154,6 @@ public class HoldStrategyTests
     [Fact]
     public async Task ExecuteAsync_WithinTolerance_DoesNotCallDevices()
     {
-        // A deviation of exactly 0.05°C is inside the 0.1°C tolerance band —
-        // no heater or fan calls should be made for that iteration.
         var heaterService = new Mock<IHeaterService>(MockBehavior.Strict);
         var fanService = new Mock<IFanService>(MockBehavior.Strict);
         var sensorService = new Mock<ISensorService>(MockBehavior.Strict);
@@ -170,7 +166,6 @@ public class HoldStrategyTests
             sensorService.Object,
             (_, _) => Task.CompletedTask);
 
-        // current = 16.05, target = 16.0 → difference = 0.05 < tolerance → no device calls
         await strategy.ExecuteAsync(16.05, 16.0, durationSeconds: 1);
 
         heaterService.Verify(h => h.SetAllHeatersAsync(It.IsAny<int>()), Times.Never);

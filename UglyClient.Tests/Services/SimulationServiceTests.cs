@@ -57,8 +57,6 @@ public class SimulationServiceTests
     [Fact]
     public async Task ResetAsync_WhenHttpFails_ErrorMessageIndicatesReset()
     {
-        // The service wraps low-level errors with a context-specific message so callers
-        // know the reset operation failed, not some unrelated call.
         var httpService = new Mock<IHttpService>(MockBehavior.Strict);
         httpService
             .Setup(service => service.PostAsync("api/Envo/reset", string.Empty))

@@ -36,8 +36,6 @@ public class FanServiceTests
     [Fact]
     public async Task SetFanStateAsync_TurnOff_CallsExpectedEndpointWithFalse()
     {
-        // The "false" body is distinct from "true" — a bug that always sends "true" would pass
-        // the TurnOn test but fail here, so both states must be exercised.
         var httpService = new Mock<IHttpService>(MockBehavior.Strict);
         httpService.Setup(service => service.PostAsync("api/fans/1", "false")).ReturnsAsync(string.Empty);
         var fanService = new FanService(httpService.Object);

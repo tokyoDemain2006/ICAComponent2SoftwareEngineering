@@ -36,7 +36,6 @@ public class MenuControllerTests
         fanMock.Setup(f => f.SetFanStateAsync(It.IsAny<int>(), It.IsAny<bool>())).Returns(Task.CompletedTask);
 
         var output = new StringWriter();
-        // Input: choose 1, fan id 1, "on", then 7 to exit
         var controller = BuildController("1\n1\non\n7\n", output, fanMock: fanMock);
 
         await controller.RunAsync();
@@ -51,7 +50,6 @@ public class MenuControllerTests
         heaterMock.Setup(h => h.SetHeaterLevelAsync(It.IsAny<int>(), It.IsAny<int>())).Returns(Task.CompletedTask);
 
         var output = new StringWriter();
-        // Input: choose 2, heater id 1, level 3, then 7 to exit
         var controller = BuildController("2\n1\n3\n7\n", output, heaterMock: heaterMock);
 
         await controller.RunAsync();
@@ -66,7 +64,6 @@ public class MenuControllerTests
         sensorMock.Setup(s => s.GetTemperatureAsync(1)).ReturnsAsync(22.5);
 
         var output = new StringWriter();
-        // Input: choose 3, sensor id 1, then 7 to exit
         var controller = BuildController("3\n1\n7\n", output, sensorMock: sensorMock);
 
         await controller.RunAsync();
@@ -80,7 +77,6 @@ public class MenuControllerTests
         var output = new StringWriter();
         var controller = BuildController("7\n", output);
 
-        // Should complete without hanging or throwing
         await controller.RunAsync();
 
         Assert.Contains("Exiting", output.ToString());
@@ -90,7 +86,6 @@ public class MenuControllerTests
     public async Task InvalidInput_DoesNotCrash_WritesErrorMessage()
     {
         var output = new StringWriter();
-        // Send invalid option, then exit
         var controller = BuildController("xyz\n7\n", output);
 
         await controller.RunAsync();
@@ -106,7 +101,6 @@ public class MenuControllerTests
                .ThrowsAsync(new DeviceServiceException("Fan API unreachable"));
 
         var output = new StringWriter();
-        // Input: choose 1, fan id 1, "on", then 7 to exit
         var controller = BuildController("1\n1\non\n7\n", output, fanMock: fanMock);
 
         await controller.RunAsync();
@@ -134,7 +128,6 @@ public class MenuControllerTests
 
         fanMock.Verify(f => f.GetAllFanStatesAsync(), Times.Once);
         heaterMock.Verify(h => h.GetAllHeaterLevelsAsync(), Times.Once);
-        // DefaultConfig has SensorCount=2, so two individual sensor reads
         sensorMock.Verify(s => s.GetTemperatureAsync(It.IsAny<int>()), Times.Exactly(2));
     }
 
@@ -176,11 +169,9 @@ public class MenuControllerTests
     [Fact]
     public async Task Option1_OutOfRangeFanId_DoesNotCallServiceAndWritesError()
     {
-        // Input validation must reject device IDs outside 1–FanCount before calling the service
         var fanMock = new Mock<IFanService>(MockBehavior.Strict);
 
         var output = new StringWriter();
-        // DefaultConfig has FanCount=2; ID 99 is out of range
         var controller = BuildController("1\n99\n7\n", output, fanMock: fanMock);
 
         await controller.RunAsync();
@@ -192,11 +183,9 @@ public class MenuControllerTests
     [Fact]
     public async Task Option2_OutOfRangeHeaterLevel_DoesNotCallServiceAndWritesError()
     {
-        // Heater levels are bounded 0–5; level 9 must be rejected before calling the service
         var heaterMock = new Mock<IHeaterService>(MockBehavior.Strict);
 
         var output = new StringWriter();
-        // Valid heater ID 1, but level 9 exceeds the maximum of 5
         var controller = BuildController("2\n1\n9\n7\n", output, heaterMock: heaterMock);
 
         await controller.RunAsync();
@@ -208,11 +197,9 @@ public class MenuControllerTests
     [Fact]
     public async Task Option1_InvalidFanState_DoesNotCallServiceAndWritesError()
     {
-        // Gibberish input for on/off must be rejected; the service must never be called.
         var fanMock = new Mock<IFanService>(MockBehavior.Strict);
 
         var output = new StringWriter();
-        // Fan ID 1 is valid; "xyz" is not a valid state
         var controller = BuildController("1\n1\nxyz\n7\n", output, fanMock: fanMock);
 
         await controller.RunAsync();
@@ -224,7 +211,6 @@ public class MenuControllerTests
     [Fact]
     public async Task Option1_OffInput_TurnsOffFan()
     {
-        // "off" is a valid state and must call SetFanStateAsync with isOn=false.
         var fanMock = new Mock<IFanService>();
         fanMock.Setup(f => f.SetFanStateAsync(It.IsAny<int>(), It.IsAny<bool>())).Returns(Task.CompletedTask);
 

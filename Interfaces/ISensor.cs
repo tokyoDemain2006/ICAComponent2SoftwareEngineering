@@ -16,12 +16,5 @@ public interface ISensor
     /// <summary>
     /// Asynchronously retrieves the current temperature reading from the sensor.
     /// </summary>
-    /// <returns>
-    /// A <see cref="Task{TResult}"/> that resolves to the sensor temperature as a
-    /// <see cref="double"/> (degrees Celsius).
-    /// </returns>
-    /// <exception cref="UglyClient.Services.DeviceServiceException">
-    /// Thrown when the sensor reading cannot be retrieved successfully.
-    /// </exception>
     Task<double> GetTemperatureAsync();
 }

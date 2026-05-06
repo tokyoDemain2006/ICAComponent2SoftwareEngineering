@@ -78,7 +78,6 @@ public class HeatUpStrategyTests
             sensorService.Object,
             (_, _) => Task.CompletedTask);
 
-        // 19.95 is within 0.1°C of 20.0 so HasReachedTarget returns true immediately
         var result = await strategy.ExecuteAsync(19.95, 20.0, 5);
 
         Assert.Equal(19.95, result, precision: 5);
@@ -109,8 +108,6 @@ public class HeatUpStrategyTests
     [Fact]
     public async Task ExecuteAsync_TargetNotReached_StopsAfterDurationIterations()
     {
-        // If the target is never reached, the strategy must stop after exactly durationSeconds
-        // iterations — not run indefinitely. This verifies the duration-limiting contract.
         var heaterService = new Mock<IHeaterService>(MockBehavior.Strict);
         var fanService = new Mock<IFanService>(MockBehavior.Strict);
         var sensorService = new Mock<ISensorService>(MockBehavior.Strict);

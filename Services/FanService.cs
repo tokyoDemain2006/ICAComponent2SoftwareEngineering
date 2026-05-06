@@ -11,22 +11,10 @@ namespace UglyClient.Services;
 /// </summary>
 public class FanService : IFanService
 {
-    /// <summary>
-    /// The shared HTTP service used to communicate with the simulation API.
-    /// </summary>
     private readonly IHttpService _httpService;
 
-    /// <summary>
-    /// The total number of fans managed by the simulation.
-    /// Used by <see cref="SetAllFansAsync"/> and <see cref="GetAllFanStatesAsync"/> to
-    /// iterate over all fan IDs (1 … <see cref="_fanCount"/>).
-    /// </summary>
     private readonly int _fanCount;
 
-    /// <summary>
-    /// Shared <see cref="JsonSerializerOptions"/> configured for case-insensitive property
-    /// name matching, compatible with the simulation API's JSON responses.
-    /// </summary>
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
@@ -36,14 +24,6 @@ public class FanService : IFanService
     /// Initialises a new instance of <see cref="FanService"/> with the specified
     /// <see cref="IHttpService"/> and optional fan count.
     /// </summary>
-    /// <param name="httpService">
-    /// The shared HTTP service used for fan requests. Must not be <see langword="null"/>.
-    /// </param>
-    /// <param name="fanCount">
-    /// The total number of fans in the simulation. Defaults to <c>3</c> when not supplied.
-    /// </param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="httpService"/> is <c>null</c>.</exception>
-    /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="fanCount"/> is less than 1.</exception>
     public FanService(IHttpService httpService, int fanCount = 3)
     {
         _httpService = httpService ?? throw new ArgumentNullException(nameof(httpService));
@@ -52,7 +32,6 @@ public class FanService : IFanService
         _fanCount = fanCount;
     }
 
-    /// <inheritdoc/>
     public async Task SetFanStateAsync(int fanId, bool isOn)
     {
         try
@@ -65,7 +44,6 @@ public class FanService : IFanService
         }
     }
 
-    /// <inheritdoc/>
     public async Task<FanDTO> GetFanStateAsync(int fanId)
     {
         string json;
@@ -90,14 +68,12 @@ public class FanService : IFanService
         }
     }
 
-    /// <inheritdoc/>
     public async Task SetAllFansAsync(bool isOn)
     {
         for (int i = 1; i <= _fanCount; i++)
             await SetFanStateAsync(i, isOn);
     }
 
-    /// <inheritdoc/>
     public async Task<IEnumerable<FanDTO>> GetAllFanStatesAsync()
     {
         var fans = new List<FanDTO>(_fanCount);

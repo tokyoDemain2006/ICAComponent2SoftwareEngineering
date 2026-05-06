@@ -9,11 +9,6 @@ namespace UglyClient.Services;
 /// Holds the fully-wired service instances produced by <see cref="DeviceServiceFactory.Create"/>.
 /// All properties expose interfaces so callers never depend on concrete service types.
 /// </summary>
-/// <param name="FanService">The fan control service.</param>
-/// <param name="HeaterService">The heater control service.</param>
-/// <param name="SensorService">The sensor read service.</param>
-/// <param name="SimulationService">The simulation-lifecycle service.</param>
-/// <param name="TemperatureController">The orchestrator that runs the multi-phase temperature cycle.</param>
 public record DeviceServices(
     IFanService FanService,
     IHeaterService HeaterService,
@@ -30,9 +25,6 @@ public static class DeviceServiceFactory
     /// <summary>
     /// Builds and wires every service required by the simulation client from the supplied config.
     /// </summary>
-    /// <param name="config">The simulation configuration. Must not be <see langword="null"/>.</param>
-    /// <returns>A <see cref="DeviceServices"/> record whose properties are all interface-typed.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="config"/> is <see langword="null"/>.</exception>
     public static DeviceServices Create(SimulationConfig config)
     {
         ArgumentNullException.ThrowIfNull(config);

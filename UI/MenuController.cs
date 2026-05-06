@@ -18,16 +18,6 @@ public sealed class MenuController
     private readonly TextReader _input;
     private readonly TextWriter _output;
 
-    /// <summary>
-    /// Initialises a new <see cref="MenuController"/>.
-    /// </summary>
-    /// <param name="fanService">Fan control service.</param>
-    /// <param name="heaterService">Heater control service.</param>
-    /// <param name="sensorService">Sensor read service.</param>
-    /// <param name="simulationService">Simulation lifecycle service.</param>
-    /// <param name="config">Simulation configuration (used for device counts and validation).</param>
-    /// <param name="input">Reader for user input. Defaults to <see cref="Console.In"/> when <see langword="null"/>.</param>
-    /// <param name="output">Writer for program output. Defaults to <see cref="Console.Out"/> when <see langword="null"/>.</param>
     public MenuController(
         IFanService fanService,
         IHeaterService heaterService,
@@ -46,10 +36,6 @@ public sealed class MenuController
         _output = output ?? Console.Out;
     }
 
-    /// <summary>
-    /// Runs the menu loop until the user selects option 7 (Exit).
-    /// </summary>
-    /// <returns>A <see cref="Task"/> that completes when the user exits.</returns>
     public async Task RunAsync()
     {
         bool running = true;

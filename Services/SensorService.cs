@@ -9,23 +9,11 @@ namespace UglyClient.Services;
 /// </summary>
 public class SensorService : ISensorService
 {
-    /// <summary>
-    /// Lookup of sensor adapters keyed by their one-based sensor identifier.
-    /// </summary>
     private readonly IReadOnlyDictionary<int, ISensor> _sensorsById;
 
     /// <summary>
     /// Initialises a new instance of <see cref="SensorService"/>.
     /// </summary>
-    /// <param name="sensors">
-    /// The sensor adapters managed by this service. Each adapter must expose a unique
-    /// <see cref="ISensor.SensorId"/> value.
-    /// </param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="sensors"/> is <see langword="null"/>.</exception>
-    /// <exception cref="ArgumentException">
-    /// Thrown when the sequence is empty, contains a <see langword="null"/> adapter,
-    /// or contains duplicate sensor identifiers.
-    /// </exception>
     public SensorService(IEnumerable<ISensor> sensors)
     {
         ArgumentNullException.ThrowIfNull(sensors);
@@ -55,7 +43,6 @@ public class SensorService : ISensorService
         _sensorsById = sensorsById;
     }
 
-    /// <inheritdoc />
     public Task<double> GetTemperatureAsync(int sensorId)
     {
         if (!_sensorsById.TryGetValue(sensorId, out var sensor))
@@ -66,7 +53,6 @@ public class SensorService : ISensorService
         return sensor.GetTemperatureAsync();
     }
 
-    /// <inheritdoc />
     public async Task<double> GetAverageTemperatureAsync()
     {
         double total = 0;
